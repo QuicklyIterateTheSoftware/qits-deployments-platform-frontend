@@ -61,10 +61,19 @@
               "buildTarget": "qits-spa-cd:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
+          }
         }
       }
     }

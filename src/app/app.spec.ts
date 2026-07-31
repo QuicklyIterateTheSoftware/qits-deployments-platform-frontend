@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { provideRouter } from '@angular/router';
@@ -13,7 +15,15 @@ import { routes } from './app.routes';
 describe('App', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), provideLocationMocks()],
+      // The root route is now the deployments page, and it reads two services on arrival — so this
+      // suite needs a backend even though what it asserts is the shell and the chrome. The
+      // requests are never flushed here; nothing in this file is about what comes back.
+      providers: [
+        provideRouter(routes),
+        provideLocationMocks(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
   });
 
@@ -36,10 +46,13 @@ describe('App', () => {
   });
 
   it('has no door of its own in the navigation yet', async () => {
-    // The layout reads the *document's* base URI, not the router, to decide which SPA it is; this
-    // app is served under `<base href="/cd/">`, so the test document has to say the same. That
-    // segment is not among ui-components 0.0.3's seven links, so the layout marks nothing current
-    // — correct today, and this assertion is what will fail on the release that adds /cd.
+    // Still true, and now it is about a page rather than a placeholder: `/cd/` serves the
+    // deployments explorer and the navigation on the left has no link to it. The layout reads the
+    // *document's* base URI, not the router, to decide which SPA it is; this app is served under
+    // `<base href="/cd/">`, so the test document has to say the same. That segment is not among
+    // ui-components 0.0.3's seven links, so the layout marks nothing current — correct today, and
+    // this assertion is what will fail on the 0.0.4 release that adds the /cd entry and takes the
+    // link count above to eight.
     document.head.appendChild(Object.assign(document.createElement('base'), { href: '/cd/' }));
     try {
       const harness = await RouterTestingHarness.create('/');
