@@ -1,0 +1,38 @@
+{
+  "name": "qits-spa-cd",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The cd service's frontend: an Angular application that consumes @qits/ui-components from qits' own npm registry. It ships no image — qits-cd serves it via Quinoa at /cd/.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/QuicklyIterateTheSoftware/qits-spa-cd.git"
+  },
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "dependencies": {
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "@qits/ui-components": "^0.0.3",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.6",
+    "@angular/cli": "^21.2.6",
+    "@angular/compiler-cli": "^21.2.0",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}
