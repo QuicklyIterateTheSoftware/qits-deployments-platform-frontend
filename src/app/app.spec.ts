@@ -41,24 +41,25 @@ describe('App', () => {
 
     const layout = harness.routeNativeElement as HTMLElement;
     expect(layout.querySelector('.qits-layout-brand')?.textContent).toContain('qits');
-    expect(layout.querySelectorAll('.qits-layout-link')).toHaveLength(7);
+    expect(layout.querySelectorAll('.qits-layout-link')).toHaveLength(8);
     expect(layout.querySelector('.qits-layout-content router-outlet')).not.toBeNull();
   });
 
-  it('has no door of its own in the navigation yet', async () => {
-    // Still true, and now it is about a page rather than a placeholder: `/cd/` serves the
-    // deployments explorer and the navigation on the left has no link to it. The layout reads the
-    // *document's* base URI, not the router, to decide which SPA it is; this app is served under
-    // `<base href="/cd/">`, so the test document has to say the same. That segment is not among
-    // ui-components 0.0.3's seven links, so the layout marks nothing current — correct today, and
-    // this assertion is what will fail on the 0.0.4 release that adds the /cd entry and takes the
-    // link count above to eight.
+  it('has a door of its own in the navigation', async () => {
+    // The release this assertion was waiting for. ui-components 0.0.4 adds the `/cd/` entry — after
+    // CI — and takes the link count above to eight, so the segment this app is served under is now
+    // among the navigation's own destinations. The layout reads the *document's* base URI, not the
+    // router, to decide which SPA it is; this app is served under `<base href="/cd/">`, so the test
+    // document has to say the same. It marks exactly one link current, and that link is CD.
     document.head.appendChild(Object.assign(document.createElement('base'), { href: '/cd/' }));
     try {
       const harness = await RouterTestingHarness.create('/');
 
       const layout = harness.routeNativeElement as HTMLElement;
-      expect(layout.querySelectorAll('.qits-layout-link[aria-current="page"]')).toHaveLength(0);
+      const current = layout.querySelectorAll('.qits-layout-link[aria-current="page"]');
+      expect(current).toHaveLength(1);
+      expect(current[0].textContent?.trim()).toBe('CD');
+      expect(current[0].getAttribute('href')).toBe('/cd/');
     } finally {
       document.head.querySelector('base')?.remove();
     }
