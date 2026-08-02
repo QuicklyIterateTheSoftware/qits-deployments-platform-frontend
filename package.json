@@ -1,6 +1,6 @@
 {
   "name": "qits-spa-cd",
-  "version": "0.0.0",
+  "version": "2026.802.163926",
   "private": true,
   "description": "The cd service's frontend: an Angular application that consumes @qits/ui-components from qits' own npm registry. It ships no image — qits-cd serves it via Quinoa at /cd/.",
   "license": "MIT",
@@ -23,7 +23,7 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "@qits/ui-components": "^0.0.4",
+    "@qits/ui-components": "^2026.802.154237",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
