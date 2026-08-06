@@ -1,10 +1,10 @@
 # The pipeline qits-ci runs on every push to a tracked branch of this repository.
 #
 # One ordinary sandboxed step, and no image: this repository does not ship a container. The app is
-# packaged and served by qits-cd, which carries this repo as a git submodule at
-# service/src/main/webui — Quinoa's ui-dir — and builds it into the service image at /cd/, so this
-# pipeline's job is to keep main green (install, lint, test, build), and qits-cd's own pipeline is
-# where the bundle becomes deployable.
+# packaged and served by qits-platform-deployments, which carries this repo as a git submodule at
+# service/src/main/webui — Quinoa's ui-dir — and builds it into the service image at
+# /platform-deployments/, so this pipeline's job is to keep main green (install, lint, test,
+# build), and that service's own pipeline is where the bundle becomes deployable.
 #
 # The recipe below is qits-spa-home's, by way of qits-spa-ci, and qits-spa-home is where it is
 # maintained; the three should keep matching. Like qits-spa-ci and unlike the other service SPAs,

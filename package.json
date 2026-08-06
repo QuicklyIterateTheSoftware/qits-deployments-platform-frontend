@@ -2,7 +2,7 @@
   "name": "qits-spa-cd",
   "version": "2026.802.163926",
   "private": true,
-  "description": "The cd service's frontend: an Angular application that consumes @qits/ui-components from qits' own npm registry. It ships no image — qits-cd serves it via Quinoa at /cd/.",
+  "description": "The deployments frontend: an Angular application that consumes @qits/ui-components from qits' own npm registry. It ships no image — qits-platform-deployments serves it via Quinoa at /platform-deployments/.",
   "license": "MIT",
   "repository": {
     "type": "git",

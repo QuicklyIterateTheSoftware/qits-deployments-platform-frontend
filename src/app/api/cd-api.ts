@@ -12,8 +12,8 @@ import type {
 } from './dto';
 
 /**
- * Everything this app reads from qits-cd. There is nothing it writes: no redeploy, no teardown, no
- * environment management. The screen reports.
+ * Everything this app reads from qits-platform-deployments. There is nothing it writes: no
+ * redeploy, no teardown, no environment management. The screen reports.
  *
  * `HttpClient` on the fetch backend rather than bare `fetch()`, for two reasons that both cash out
  * elsewhere: `HttpTestingController` is the only request-mocking story Angular ships and the specs
@@ -41,7 +41,7 @@ export class CdApi {
    */
   async environments(): Promise<readonly CdEnvironmentDto[]> {
     const response = await firstValueFrom(
-      this.http.get<CdEnvironmentsResponse>(`${this.base}/cd/api/environments`),
+      this.http.get<CdEnvironmentsResponse>(`${this.base}/platform-deployments/api/environments`),
     );
     return response.environments;
   }
@@ -57,7 +57,7 @@ export class CdApi {
   async applications(environmentId: string): Promise<readonly CdApplicationDto[]> {
     const response = await firstValueFrom(
       this.http.get<CdEnvironmentResponse>(
-        `${this.base}/cd/api/environments/${encodeURIComponent(environmentId)}`,
+        `${this.base}/platform-deployments/api/environments/${encodeURIComponent(environmentId)}`,
       ),
     );
     return response.environment.applications ?? [];
@@ -74,7 +74,9 @@ export class CdApi {
   async deployments(environmentId: string): Promise<readonly CdDeploymentDto[]> {
     const params = new HttpParams().set('environmentId', environmentId);
     const response = await firstValueFrom(
-      this.http.get<CdDeploymentsResponse>(`${this.base}/cd/api/deployments`, { params }),
+      this.http.get<CdDeploymentsResponse>(`${this.base}/platform-deployments/api/deployments`, {
+        params,
+      }),
     );
     return response.deployments;
   }

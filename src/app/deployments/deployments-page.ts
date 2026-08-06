@@ -72,15 +72,17 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * - an environment no project's slug matches, in a bucket of its own that is drawn always, because
  *   "0 environments" is information.
  *
- * Neither direction needs a service gap. `GET /cd/api/environments` returns everything, so the
- * unmatched set is a client-side difference — the asymmetry with the ci explorer, whose run listing
+ * Neither direction needs a service gap. `GET /platform-deployments/api/environments` returns
+ * everything, so the unmatched set is a client-side difference — the asymmetry with the ci
+ * explorer, whose run listing
  * takes a mandatory repository filter and therefore cannot see its own orphans without one.
  *
  * **Two requests on load, both flat lists**; everything below costs a click (Decision 3). Expanding
  * a project costs two more, because the environment listing answers `applications: null` by design
  * and the deployment listing is a separate resource. Expansion lives in the query parameters
- * (`/cd/?project=…`, and `env=` for the bucket) rather than in path segments: it is view state, the
- * path is for resources, and a history entry per expansion is what makes the back button mean
+ * (`/platform-deployments/?project=…`, and `env=` for the bucket) rather than in path segments: it
+ * is view state, the path is for resources, and a history entry per expansion is what makes the
+ * back button mean
  * "collapse".
  */
 @Component({
@@ -409,12 +411,13 @@ export class DeploymentsPage {
   }
 
   /**
-   * The sentence for a project whose slug names nothing in qits-cd. It quotes the *slug*, not the
-   * project's display name, because the slug is what the convention actually compares — an operator
-   * chasing this reads it against `GET /cd/api/environments` and the two have to be the same string.
+   * The sentence for a project whose slug names nothing in qits-platform-deployments. It quotes
+   * the *slug*, not the project's display name, because the slug is what the convention actually
+   * compares — an operator chasing this reads it against
+   * `GET /platform-deployments/api/environments` and the two have to be the same string.
    */
   protected noEnvironmentMessage(project: ProjectDto): string {
-    return `No environment named "${project.slug}" exists in qits-cd.`;
+    return `No environment named "${project.slug}" exists in qits-platform-deployments.`;
   }
 
   /** The bucket's own count, drawn whether or not there is anything in it. */

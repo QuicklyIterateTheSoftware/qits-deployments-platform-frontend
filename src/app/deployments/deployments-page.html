@@ -20,8 +20,8 @@
   @if (projectsBanner()) {
     <p class="banner" role="alert">
       <span>
-        ⚠ Projects are unavailable — {{ projectsBanner() }}. Showing the environments qits-cd holds,
-        none of which can be matched to a project from here.
+        ⚠ Projects are unavailable — {{ projectsBanner() }}. Showing the environments
+        qits-platform-deployments holds, none of which can be matched to a project from here.
       </span>
       <qits-button variant="ghost" size="sm" (pressed)="loadProjects()">Retry</qits-button>
     </p>

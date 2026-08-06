@@ -1,7 +1,7 @@
 /**
  * The wire shapes this client reads, hand-written and copied field-for-field from the Java records
- * on the other side (`CdEnvironmentDto`, `CdApplicationDto`, `CdDeploymentDto` in qits-cd;
- * `ProjectDto` in qits-projects).
+ * on the other side (`CdEnvironmentDto`, `CdApplicationDto`, `CdDeploymentDto` in
+ * qits-platform-deployments; `ProjectDto` in qits-projects).
  *
  * Hand-written rather than generated, deliberately (the explorer plan's Decision 1). The platform
  * generates OpenAPI *documents*, not clients, and every controller nests its request and response
@@ -41,8 +41,9 @@ export function isInFlight(status: CdDeploymentStatus): boolean {
 /**
  * One tracked application inside an environment.
  *
- * `repoId` is displayed and never joined on: qits-cd's applications are seeded with the git-host
- * directory name, the same string `CiRun.repoId` carries, but this page's only join is
+ * `repoId` is displayed and never joined on: the applications in qits-platform-deployments are
+ * seeded with the git-host directory name, the same string `CiRun.repoId` carries, but this
+ * page's only join is
  * environment-to-project by name, so `repoId` is a column and nothing more.
  */
 export interface CdApplicationDto {
@@ -70,13 +71,14 @@ export interface CdEnvironmentDto {
  * One deployment of one application.
  *
  * `runId` is the ci run that produced the image, and it is the entire reason the commit cell can
- * link out of this application: qits-cd has always *received* it on the build intake and now
- * records it. It is null for every row written before that column existed, so the link is drawn
+ * link out of this application: qits-platform-deployments has always *received* it on the build
+ * intake and now records it. It is null for every row written before that column existed, so the
+ * link is drawn
  * per-row and its absence is not an error — it is history.
  *
  * `detail` is a clob: the reason an `IMAGE_MISSING` or `FAILED` row is what it is. A row expands in
- * place to show it, which is what stands in for a deployment detail route (Decision 4) — qits-cd
- * has no deployment-by-id endpoint and this screen needs none.
+ * place to show it, which is what stands in for a deployment detail route (Decision 4) —
+ * qits-platform-deployments has no deployment-by-id endpoint and this screen needs none.
  */
 export interface CdDeploymentDto {
   readonly id: string;

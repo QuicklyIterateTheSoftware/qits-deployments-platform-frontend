@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /**
- * A URL under `/cd/` that this app does not recognise.
+ * A URL under `/platform-deployments/` that this app does not recognise.
  *
  * It renders a small page and stops there. It deliberately does **not** copy spa-home's exit
  * behaviour of handing the URL back to the gateway: that is the landing page's job, and it is
  * correct only because spa-home is mounted at the root, where an unknown first segment is another
- * micro frontend rather than a typo. Here the segment is already ours — the gateway routed `/cd/…`
- * to qits-cd on purpose — so there is nobody to hand it to, and bouncing it back would be a loop.
+ * micro frontend rather than a typo. Here the segment is already ours — the gateway routed
+ * `/platform-deployments/…` to qits-platform-deployments on purpose — so there is nobody to hand
+ * it to, and bouncing it back would be a loop.
  */
 @Component({
   selector: 'app-not-found',

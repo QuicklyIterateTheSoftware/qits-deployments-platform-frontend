@@ -16,7 +16,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "baseHref": "/cd/",
+            "baseHref": "/platform-deployments/",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "assets": [

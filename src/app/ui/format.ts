@@ -1,8 +1,9 @@
 /**
  * The small conversions the page needs, kept out of the template so they can be asserted directly.
  *
- * Every timestamp is rendered in **UTC**. qits-cd stamps `Instant`s, an operator reading this table
- * is usually reading a log line beside it, and a browser-local rendering would make two people
+ * Every timestamp is rendered in **UTC**. qits-platform-deployments stamps `Instant`s, an operator
+ * reading this table is usually reading a log line beside it, and a browser-local rendering would
+ * make two people
  * looking at the same deployment disagree about when it happened. The `Z` on the long form says so
  * out loud.
  *

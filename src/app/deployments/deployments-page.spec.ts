@@ -147,7 +147,7 @@ describe('DeploymentsPage', () => {
   }
 
   function flushEnvironments(environments: readonly CdEnvironmentDto[]): void {
-    http.expectOne('/cd/api/environments').flush({ environments });
+    http.expectOne('/platform-deployments/api/environments').flush({ environments });
   }
 
   async function flushRoots(
@@ -162,7 +162,7 @@ describe('DeploymentsPage', () => {
   function expectDeployments(environmentId: string) {
     return http.expectOne(
       (request) =>
-        request.url === '/cd/api/deployments' &&
+        request.url === '/platform-deployments/api/deployments' &&
         request.params.get('environmentId') === environmentId,
     );
   }
@@ -173,7 +173,7 @@ describe('DeploymentsPage', () => {
     applications: readonly CdApplicationDto[],
     deployments: readonly CdDeploymentDto[],
   ): Promise<void> {
-    http.expectOne(`/cd/api/environments/${environmentId}`).flush({
+    http.expectOne(`/platform-deployments/api/environments/${environmentId}`).flush({
       environment: { ...environment(environmentId, environmentId), applications },
     });
     expectDeployments(environmentId).flush({ deployments });
@@ -218,7 +218,7 @@ describe('DeploymentsPage', () => {
 
     await click('scratch');
 
-    expect(text()).toContain('No environment named "scratch" exists in qits-cd.');
+    expect(text()).toContain('No environment named "scratch" exists in qits-platform-deployments.');
     // Nothing to fetch for an environment that does not exist.
     http.verify();
   });
@@ -349,7 +349,7 @@ describe('DeploymentsPage', () => {
     );
 
     // A plain href across applications: /ci/ is another SPA behind the same gateway, and this
-    // app's router owns nothing outside /cd/.
+    // app's router owns nothing outside /platform-deployments/.
     const link = page().querySelector<HTMLAnchorElement>(
       'a[href="/ci/runs/da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61"]',
     );
@@ -367,7 +367,7 @@ describe('DeploymentsPage', () => {
 
     await click('qits');
     http
-      .expectOne('/cd/api/environments/e1')
+      .expectOne('/platform-deployments/api/environments/e1')
       .flush(null, { status: 503, statusText: 'Service Unavailable' });
     expectDeployments('e1').flush(null, { status: 503, statusText: 'Service Unavailable' });
     await settle();
@@ -386,7 +386,9 @@ describe('DeploymentsPage', () => {
   it('shows a full-page error only when both roots fail', async () => {
     await open();
     http.expectOne('/projects/api/projects').flush(null, { status: 500, statusText: 'Error' });
-    http.expectOne('/cd/api/environments').flush(null, { status: 500, statusText: 'Error' });
+    http
+      .expectOne('/platform-deployments/api/environments')
+      .flush(null, { status: 500, statusText: 'Error' });
     await settle();
 
     expect(text()).toContain('Could not load the page');
@@ -408,10 +410,12 @@ describe('DeploymentsPage', () => {
     expect(labels('.bucket .label')).toContain('qits');
   });
 
-  it('never claims an environment is absent when qits-cd is the thing that is down', async () => {
+  it('never claims an environment is absent when the deployments service is down', async () => {
     await open();
     flushProjects([project('p1', 'qits', 'qits')]);
-    http.expectOne('/cd/api/environments').flush(null, { status: 503, statusText: 'Down' });
+    http
+      .expectOne('/platform-deployments/api/environments')
+      .flush(null, { status: 503, statusText: 'Down' });
     await settle();
 
     expect(text()).toContain('Environments are unavailable');
@@ -420,7 +424,7 @@ describe('DeploymentsPage', () => {
     await click('qits');
 
     // The lie this page must not tell: "no environment named qits exists" when nothing was asked.
-    expect(text()).not.toContain('exists in qits-cd');
+    expect(text()).not.toContain('exists in qits-platform-deployments');
     expect(text()).toContain('Could not load environments — 503');
   });
 

@@ -128,7 +128,8 @@ interface Row {
                       <!--
                         A plain href, never a routerLink: /ci/ is a different application served by
                         a different service behind the same gateway, and routing to it in-app would
-                        hand the URL to this SPA's router, which owns nothing outside /cd/.
+                        hand the URL to this SPA's router, which owns nothing outside
+                        /platform-deployments/.
                       -->
                       <a
                         [href]="'/ci/runs/' + deployment.runId"
