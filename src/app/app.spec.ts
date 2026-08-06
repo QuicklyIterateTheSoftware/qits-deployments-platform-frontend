@@ -61,6 +61,6 @@ describe('App', () => {
     const labels = Array.from(layout.querySelectorAll('.qits-layout-link')).map((link) =>
       link.textContent?.trim(),
     );
-    expect(labels).toContain('CD');
+    expect(labels).toContain('Deployments');
   });
 });
