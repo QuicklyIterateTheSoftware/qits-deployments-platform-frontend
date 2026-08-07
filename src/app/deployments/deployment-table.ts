@@ -15,15 +15,19 @@ import { StatusBadge } from '../ui/status-badge';
 import { tickingNow } from '../ui/ticker';
 
 /**
- * One environment as this page holds it: the two lists an expansion fetches, each with its own
- * state so a retry knows what to re-ask for.
+ * One plane as this page holds it — an environment, or the platform — as the two lists an expansion
+ * fetches, each with its own state so a retry knows what to re-ask for.
+ *
+ * The name is the environment's because that is the only plane this table drew for a release, and
+ * the platform one arrived into the same shape rather than beside it: both are "applications, and
+ * what is deployed of them", and nothing below this line can tell them apart.
  */
 export interface EnvironmentNode {
   readonly applications: Loadable<readonly CdApplicationDto[]>;
   readonly deployments: Loadable<readonly CdDeploymentDto[]>;
 }
 
-/** An environment nobody has expanded: no request made, and that is a state rather than an absence. */
+/** A plane nobody has expanded: no request made, and that is a state rather than an absence. */
 export const UNVISITED: EnvironmentNode = { applications: IDLE, deployments: IDLE };
 
 /** One application's line in the table, and the history hanging behind it. */
@@ -73,7 +77,7 @@ interface Row {
 
     @if (state().kind === 'ready') {
       @if (rows().length === 0) {
-        <app-empty message="This environment tracks no applications." />
+        <app-empty [message]="emptyMessage()" />
       } @else {
         <table class="deployments">
           <thead>
@@ -317,8 +321,15 @@ interface Row {
   `,
 })
 export class DeploymentTable {
-  /** The environment's two lists, exactly as the page holds them. */
+  /** The plane's two lists, exactly as the page holds them. */
   readonly node = input.required<EnvironmentNode>();
+
+  /**
+   * What an empty table says. It is a caller's sentence because the table draws two kinds of plane
+   * now, and a platform bucket reading "this environment tracks no applications" would name a thing
+   * that does not exist.
+   */
+  readonly emptyMessage = input('This environment tracks no applications.');
 
   /** Retry both requests — the inline retry on a failed environment. */
   readonly reload = output<void>();

@@ -62,7 +62,7 @@
               @if (environment) {
                 <app-deployment-table
                   [node]="nodeOf(environment.id)"
-                  (reload)="loadEnvironment(environment.id)"
+                  (reload)="loadPlane(environment.id)"
                 />
               } @else {
                 <app-empty [message]="noEnvironmentMessage(project)" />
@@ -83,6 +83,29 @@
         <li><app-empty message="No projects yet." /></li>
       }
     }
+
+    <!--
+      A root of its own, because a platform service is in no environment and no project's slug can
+      reach it. Closed on arrival: unlike the bucket below, opening it costs the same two requests
+      every other expansion costs.
+    -->
+    <li class="bucket">
+      <app-tree-node
+        label="Platform services"
+        tag="platform"
+        [meta]="platformMeta()"
+        [expanded]="platformOpen()"
+        (toggled)="togglePlatform()"
+      >
+        @if (platformOpen()) {
+          <app-deployment-table
+            [node]="nodeOf(platformPlane)"
+            emptyMessage="No platform service is registered."
+            (reload)="loadPlane(platformPlane)"
+          />
+        }
+      </app-tree-node>
+    </li>
 
     <li class="bucket">
       <app-tree-node
@@ -112,7 +135,7 @@
                 @if (expandedEnvironments().has(environment.id)) {
                   <app-deployment-table
                     [node]="nodeOf(environment.id)"
-                    (reload)="loadEnvironment(environment.id)"
+                    (reload)="loadPlane(environment.id)"
                   />
                 }
               </app-tree-node>

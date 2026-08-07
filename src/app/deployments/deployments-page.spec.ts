@@ -39,13 +39,32 @@ describe('DeploymentsPage', () => {
     applications: null,
   });
 
-  const application = (id: string, name: string): CdApplicationDto => ({
+  const application = (
+    id: string,
+    name: string,
+    over: Partial<CdApplicationDto> = {},
+  ): CdApplicationDto => ({
     id,
     repoId: name,
     name,
+    environmentId: 'e1',
+    environmentName: 'qits',
+    target: 'ENVIRONMENT',
+    availableOnEnv: false,
+    branch: null,
     healthPath: null,
     createdAt: '2026-07-01T00:00:00Z',
+    ...over,
   });
+
+  /** A platform service, as the flat listing carries it: no tier, and a branch of its own. */
+  const platformApplication = (name: string): CdApplicationDto =>
+    application(`platform:${name}`, name, {
+      environmentId: null,
+      environmentName: null,
+      target: 'PLATFORM',
+      branch: 'platform/main',
+    });
 
   const deployment = (
     id: string,
@@ -159,12 +178,22 @@ describe('DeploymentsPage', () => {
     await settle();
   }
 
-  function expectDeployments(environmentId: string) {
+  function expectDeployments(planeId: string) {
     return http.expectOne(
       (request) =>
         request.url === '/platform-deployments/api/deployments' &&
-        request.params.get('environmentId') === environmentId,
+        request.params.get('environmentId') === planeId,
     );
+  }
+
+  /** The two requests the platform bucket costs — the flat catalogue, and the plane's own rows. */
+  async function flushPlatform(
+    applications: readonly CdApplicationDto[],
+    deployments: readonly CdDeploymentDto[],
+  ): Promise<void> {
+    http.expectOne('/platform-deployments/api/applications').flush({ applications });
+    expectDeployments('platform').flush({ deployments });
+    await settle();
   }
 
   /** The two requests an expansion costs, answered together. */
@@ -254,6 +283,46 @@ describe('DeploymentsPage', () => {
 
     expect(text()).toContain('qits-spike');
     expect(text()).toContain('ACTIVE');
+  });
+
+  it('names the platform plane on arrival, asks nothing about it, and draws it on a click', async () => {
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    // The regression this holds: read through the projects alone, this page showed the tiers and
+    // gave no sign the platform's own applications existed at all.
+    expect(text()).toContain('Platform services');
+    http.verify();
+
+    await click('Platform services');
+    await flushPlatform(
+      [platformApplication('qits-idp'), platformApplication('qits-ci')],
+      [deployment('dp1', 'platform:qits-idp', { applicationName: 'qits-idp' })],
+    );
+
+    expect(text()).toContain('2 services');
+    expect(text()).toContain('qits-idp');
+    expect(text()).toContain('ACTIVE');
+    // And the never-deployed claim holds on this plane too, for the same reason.
+    expect(text()).toContain('qits-ci');
+    expect(text()).toContain('never deployed');
+  });
+
+  it('keeps the tiered entries of the flat catalogue out of the platform bucket', async () => {
+    await open();
+    await flushRoots([], [environment('e1', 'qits')]);
+
+    await click('Platform services');
+    await flushPlatform(
+      [platformApplication('qits-idp'), application('e1:qits-stt', 'qits-stt')],
+      [],
+    );
+
+    // `GET /applications` spans both planes — it is the listing that reaches the platform, not a
+    // platform listing. A tier's application belongs under its project.
+    expect(text()).toContain('1 service');
+    expect(text()).toContain('qits-idp');
+    expect(text()).not.toContain('qits-stt');
   });
 
   it('draws an application that has never been deployed, because the row comes from the environment', async () => {
@@ -452,7 +521,7 @@ describe('DeploymentsPage', () => {
       [deployment('d1', 'a1', { status: 'STARTING', finishedAt: null })],
     );
 
-    expect(text()).toContain('following 1 environment');
+    expect(text()).toContain('following 1 plane');
 
     await tick(POLL_INTERVAL_MS);
     // Only the deployments are re-read; what an environment tracks does not change mid-start.

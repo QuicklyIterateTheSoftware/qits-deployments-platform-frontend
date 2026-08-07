@@ -74,6 +74,33 @@ describe('CdApi', () => {
     await expect(applications).resolves.toEqual([]);
   });
 
+  it('takes the platform services off the flat listing and leaves the tiered ones', async () => {
+    // `GET /applications` is the only listing that reaches the platform plane, and it carries both
+    // planes — so the client is where the tiered entries go, and the plane is what comes back.
+    const applications = api.platformApplications();
+    http.expectOne('/platform-deployments/api/applications').flush({
+      applications: [
+        { id: 'platform:qits-idp', repoId: 'qits-idp', name: 'qits-idp', target: 'PLATFORM' },
+        { id: 'e1:qits-stt', repoId: 'qits-stt', name: 'qits-stt', target: 'ENVIRONMENT' },
+      ],
+    });
+    await expect(applications).resolves.toMatchObject([{ id: 'platform:qits-idp' }]);
+  });
+
+  it('asks for the platform plane by name where an environment id goes', async () => {
+    // `platform` is the stand-in the application ids already carry, and the one value of this
+    // filter that is not an environment id. It cannot collide: an environment id is a UUID.
+    const deployments = api.deployments('platform');
+    http
+      .expectOne(
+        (candidate) =>
+          candidate.url === '/platform-deployments/api/deployments' &&
+          candidate.params.get('environmentId') === 'platform',
+      )
+      .flush({ deployments: [] });
+    await expect(deployments).resolves.toEqual([]);
+  });
+
   it('filters deployments by environment, which the service requires', async () => {
     const deployments = api.deployments('e1');
     const request = http.expectOne(

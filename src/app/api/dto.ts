@@ -39,17 +39,43 @@ export function isInFlight(status: CdDeploymentStatus): boolean {
 }
 
 /**
- * One tracked application inside an environment.
+ * Which plane an application is deployed on: one tier's, or the platform's own.
+ *
+ * A `PLATFORM` application belongs to no environment — it is deployed once for the whole platform —
+ * which is why the environment aggregate cannot list it and the flat listing exists.
+ */
+export type CdDeploymentTarget = 'ENVIRONMENT' | 'PLATFORM';
+
+/**
+ * The word that goes where an environment id goes and names the platform plane instead.
+ *
+ * It is the same stand-in the server puts at the front of a platform application's id
+ * (`platform:qits-idp`), and the deployment listing takes it as the value of the `environmentId`
+ * filter. Unambiguous by construction: a real environment id is a random UUID.
+ */
+export const PLATFORM_PLANE = 'platform';
+
+/**
+ * One tracked application, flattened into one tier.
  *
  * `repoId` is displayed and never joined on: the applications in qits-platform-deployments are
  * seeded with the git-host directory name, the same string `CiRun.repoId` carries, but this
  * page's only join is
  * environment-to-project by name, so `repoId` is a column and nothing more.
+ *
+ * `environmentId`, `environmentName` and `branch` are the plane's mirror image: the first two are
+ * null exactly when `target` is `PLATFORM`, and `branch` is set only then — an environment
+ * application takes its branch from the environment it is linked into.
  */
 export interface CdApplicationDto {
   readonly id: string;
   readonly repoId: string;
   readonly name: string;
+  readonly environmentId: string | null;
+  readonly environmentName: string | null;
+  readonly target: CdDeploymentTarget;
+  readonly availableOnEnv: boolean;
+  readonly branch: string | null;
   readonly healthPath: string | null;
   readonly createdAt: string;
 }
@@ -101,6 +127,17 @@ export interface CdEnvironmentsResponse {
 /** cd's single-environment envelope — the one that carries `applications`. */
 export interface CdEnvironmentResponse {
   readonly environment: CdEnvironmentDto;
+}
+
+/**
+ * cd's flat application listing: every application on both planes, one entry per tier.
+ *
+ * The only listing that reaches a platform service at all. Reading the catalogue through the
+ * environments leaves qits-idp and qits-platform-deployments itself out of it, because neither
+ * belongs to a tier.
+ */
+export interface CdApplicationsResponse {
+  readonly applications: readonly CdApplicationDto[];
 }
 
 /** cd's deployment list envelope. Sorted `createdAt desc, id desc` by the server. */

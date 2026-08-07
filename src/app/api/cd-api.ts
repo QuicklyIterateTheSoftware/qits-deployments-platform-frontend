@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { QITS_API_BASE } from './api-base';
 import type {
   CdApplicationDto,
+  CdApplicationsResponse,
   CdDeploymentDto,
   CdDeploymentsResponse,
   CdEnvironmentDto,
@@ -64,15 +65,34 @@ export class CdApi {
   }
 
   /**
-   * One environment's deployments, newest first, across all of its applications.
+   * Every platform service, off the flat listing that spans both planes.
    *
-   * `environmentId` is a required filter and the server answers 400 without it and 404 for an
-   * environment it does not know — so this is never called speculatively. The "current deployment
-   * per application" is the first row per `applicationId` in what comes back: one client-side pass
-   * over an already-sorted list, and no third request.
+   * The platform plane has no environment to read it through — that is what being on it means — so
+   * this is the only way to reach qits-idp, qits-ci or this component's own row at all.
+   *
+   * **The filter is here rather than on the page**, and the page is the poorer for knowing less:
+   * the listing carries both planes and the server offers no `?target=`, so somewhere has to drop
+   * the tiered entries. Doing it in the client keeps the page's two caches plane-agnostic — a
+   * platform plane and an environment are the same shape to everything downstream.
    */
-  async deployments(environmentId: string): Promise<readonly CdDeploymentDto[]> {
-    const params = new HttpParams().set('environmentId', environmentId);
+  async platformApplications(): Promise<readonly CdApplicationDto[]> {
+    const response = await firstValueFrom(
+      this.http.get<CdApplicationsResponse>(`${this.base}/platform-deployments/api/applications`),
+    );
+    return response.applications.filter((application) => application.target === 'PLATFORM');
+  }
+
+  /**
+   * One plane's deployments, newest first, across all of its applications.
+   *
+   * `plane` is an environment id, or `PLATFORM_PLANE` for the applications that belong to no tier.
+   * It is a required filter and the server answers 400 without it and 404 for an environment it
+   * does not know — so this is never called speculatively. The "current deployment per application"
+   * is the first row per `applicationId` in what comes back: one client-side pass over an
+   * already-sorted list, and no third request.
+   */
+  async deployments(plane: string): Promise<readonly CdDeploymentDto[]> {
+    const params = new HttpParams().set('environmentId', plane);
     const response = await firstValueFrom(
       this.http.get<CdDeploymentsResponse>(`${this.base}/platform-deployments/api/deployments`, {
         params,
