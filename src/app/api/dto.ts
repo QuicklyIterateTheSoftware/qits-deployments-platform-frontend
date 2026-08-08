@@ -1,7 +1,7 @@
 /**
  * The wire shapes this client reads, hand-written and copied field-for-field from the Java records
- * on the other side (`CdEnvironmentDto`, `CdApplicationDto`, `CdDeploymentDto` in
- * qits-platform-deployments; `ProjectDto` in qits-projects).
+ * on the other side (`CdEnvironmentDto`, `CdApplicationDto`, `CdDeploymentDto` in qits-deployments;
+ * `ProjectDto` in qits-projects).
  *
  * Hand-written rather than generated, deliberately (the explorer plan's Decision 1). The platform
  * generates OpenAPI *documents*, not clients, and every controller nests its request and response
@@ -50,17 +50,16 @@ export type CdDeploymentTarget = 'ENVIRONMENT' | 'PLATFORM';
  * The word that goes where an environment id goes and names the platform plane instead.
  *
  * It is the same stand-in the server puts at the front of a platform application's id
- * (`platform:qits-idp`), and the deployment listing takes it as the value of the `environmentId`
- * filter. Unambiguous by construction: a real environment id is a random UUID.
+ * (`platform:qits-platform-idp`), and the deployment listing takes it as the value of the
+ * `environmentId` filter. Unambiguous by construction: a real environment id is a random UUID.
  */
 export const PLATFORM_PLANE = 'platform';
 
 /**
  * One tracked application, flattened into one tier.
  *
- * `repoId` is displayed and never joined on: the applications in qits-platform-deployments are
- * seeded with the git-host directory name, the same string `CiRun.repoId` carries, but this
- * page's only join is
+ * `repoId` is displayed and never joined on: the applications in qits-deployments are seeded with
+ * the git-host directory name, the same string `CiRun.repoId` carries, but this page's only join is
  * environment-to-project by name, so `repoId` is a column and nothing more.
  *
  * `environmentId`, `environmentName` and `branch` are the plane's mirror image: the first two are
@@ -97,14 +96,13 @@ export interface CdEnvironmentDto {
  * One deployment of one application.
  *
  * `runId` is the ci run that produced the image, and it is the entire reason the commit cell can
- * link out of this application: qits-platform-deployments has always *received* it on the build
- * intake and now records it. It is null for every row written before that column existed, so the
- * link is drawn
+ * link out of this application: qits-deployments has always *received* it on the build intake and
+ * now records it. It is null for every row written before that column existed, so the link is drawn
  * per-row and its absence is not an error — it is history.
  *
  * `detail` is a clob: the reason an `IMAGE_MISSING` or `FAILED` row is what it is. A row expands in
  * place to show it, which is what stands in for a deployment detail route (Decision 4) —
- * qits-platform-deployments has no deployment-by-id endpoint and this screen needs none.
+ * qits-deployments has no deployment-by-id endpoint and this screen needs none.
  */
 export interface CdDeploymentDto {
   readonly id: string;
@@ -133,7 +131,7 @@ export interface CdEnvironmentResponse {
  * cd's flat application listing: every application on both planes, one entry per tier.
  *
  * The only listing that reaches a platform service at all. Reading the catalogue through the
- * environments leaves qits-idp and qits-platform-deployments itself out of it, because neither
+ * environments leaves qits-platform-idp and qits-deployments itself out of it, because neither
  * belongs to a tier.
  */
 export interface CdApplicationsResponse {

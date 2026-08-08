@@ -1,7 +1,7 @@
 # The pipeline qits-ci runs on every push to a tracked branch of this repository.
 #
 # One ordinary sandboxed step, and no image: this repository does not ship a container. The app is
-# packaged and served by qits-platform-deployments, which carries this repo as a git submodule at
+# packaged and served by qits-deployments, which carries this repo as a git submodule at
 # service/src/main/webui — Quinoa's ui-dir — and builds it into the service image at
 # /platform-deployments/, so this pipeline's job is to keep main green (install, lint, test,
 # build), and that service's own pipeline is where the bundle becomes deployable.
@@ -34,16 +34,17 @@ steps:
       # npm's own knob for exactly this, `--replace-registry-host=always`, cannot do it against a
       # registry mounted under a path. @npmcli/arborist glues rather than resolves (reify.js:
       # `registry.slice(0, -1) + resolvedURL.pathname`), so
-      # http://qits-artifacts:8080/artifacts/npm/npmjs/ + /artifacts/npm/npmjs/zone.js/-/…tgz comes
-      # out as …/artifacts/npm/npmjs/artifacts/npm/npmjs/zone.js/-/…tgz and every tarball 404s.
+      # http://qits-platform-artifacts:8080/artifacts/npm/npmjs/ +
+      # /artifacts/npm/npmjs/zone.js/-/…tgz comes out as
+      # …/artifacts/npm/npmjs/artifacts/npm/npmjs/zone.js/-/…tgz and every tarball 404s.
       # Measured on npm 10.9.4.
       #
       # The origin is derived from the injected env rather than spelled here: no repository states
       # a deployment's addresses, and the one address this repo does state (localhost:8081, in
       # .npmrc, for a developer on the host) is the one being replaced. Both registries are the
-      # same qits-artifacts, so one origin covers the cached npmjs tarballs and the @qits ones
-      # alike; were that ever to stop being true, the scoped tarballs would 404 rather than resolve
-      # to something wrong.
+      # same qits-platform-artifacts, so one origin covers the cached npmjs tarballs and the @qits
+      # ones alike; were that ever to stop being true, the scoped tarballs would 404 rather than
+      # resolve to something wrong.
       npm_origin=$(node -p 'new URL(process.env.QITS_NPM_PROXY_URL).origin')
       sed -i -E "s#(\"resolved\": \")https?://[^/\"]+#\1$npm_origin#" package-lock.json
 

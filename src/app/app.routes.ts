@@ -17,7 +17,7 @@ import { NotFound } from './not-found/not-found';
  * path is for resources — and because query parameters keep the back button meaning "collapse".
  *
  * **There is no detail route**, and that is a decision rather than an omission. A deployment row
- * already carries everything qits-platform-deployments knows about it — `commitSha`, `status`,
+ * already carries everything qits-deployments knows about it — `commitSha`, `status`,
  * `containerName`, `detail`, `createdAt`, `finishedAt` — so the row expands in place. The service
  * has no deployment-by-id endpoint, and adding one to serve a screen we decided not to draw would
  * be building backwards.

@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "qits-platform-spa-deployments": {
+    "qits-spa-deployments": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -55,10 +55,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "qits-platform-spa-deployments:build:production"
+              "buildTarget": "qits-spa-deployments:build:production"
             },
             "development": {
-              "buildTarget": "qits-platform-spa-deployments:build:development"
+              "buildTarget": "qits-spa-deployments:build:development"
             }
           },
           "defaultConfiguration": "development",

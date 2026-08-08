@@ -247,7 +247,7 @@ describe('DeploymentsPage', () => {
 
     await click('scratch');
 
-    expect(text()).toContain('No environment named "scratch" exists in qits-platform-deployments.');
+    expect(text()).toContain('No environment named "scratch" exists in qits-deployments.');
     // Nothing to fetch for an environment that does not exist.
     http.verify();
   });
@@ -296,12 +296,12 @@ describe('DeploymentsPage', () => {
 
     await click('Platform services');
     await flushPlatform(
-      [platformApplication('qits-idp'), platformApplication('qits-ci')],
-      [deployment('dp1', 'platform:qits-idp', { applicationName: 'qits-idp' })],
+      [platformApplication('qits-platform-idp'), platformApplication('qits-ci')],
+      [deployment('dp1', 'platform:qits-platform-idp', { applicationName: 'qits-platform-idp' })],
     );
 
     expect(text()).toContain('2 services');
-    expect(text()).toContain('qits-idp');
+    expect(text()).toContain('qits-platform-idp');
     expect(text()).toContain('ACTIVE');
     // And the never-deployed claim holds on this plane too, for the same reason.
     expect(text()).toContain('qits-ci');
@@ -314,14 +314,14 @@ describe('DeploymentsPage', () => {
 
     await click('Platform services');
     await flushPlatform(
-      [platformApplication('qits-idp'), application('e1:qits-stt', 'qits-stt')],
+      [platformApplication('qits-platform-idp'), application('e1:qits-stt', 'qits-stt')],
       [],
     );
 
     // `GET /applications` spans both planes — it is the listing that reaches the platform, not a
     // platform listing. A tier's application belongs under its project.
     expect(text()).toContain('1 service');
-    expect(text()).toContain('qits-idp');
+    expect(text()).toContain('qits-platform-idp');
     expect(text()).not.toContain('qits-stt');
   });
 
@@ -493,7 +493,7 @@ describe('DeploymentsPage', () => {
     await click('qits');
 
     // The lie this page must not tell: "no environment named qits exists" when nothing was asked.
-    expect(text()).not.toContain('exists in qits-platform-deployments');
+    expect(text()).not.toContain('exists in qits-deployments');
     expect(text()).toContain('Could not load environments — 503');
   });
 

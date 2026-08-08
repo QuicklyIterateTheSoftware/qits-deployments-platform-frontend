@@ -13,8 +13,8 @@ import type {
 } from './dto';
 
 /**
- * Everything this app reads from qits-platform-deployments. There is nothing it writes: no
- * redeploy, no teardown, no environment management. The screen reports.
+ * Everything this app reads from qits-deployments. There is nothing it writes: no redeploy, no
+ * teardown, no environment management. The screen reports.
  *
  * `HttpClient` on the fetch backend rather than bare `fetch()`, for two reasons that both cash out
  * elsewhere: `HttpTestingController` is the only request-mocking story Angular ships and the specs
@@ -68,7 +68,7 @@ export class CdApi {
    * Every platform service, off the flat listing that spans both planes.
    *
    * The platform plane has no environment to read it through — that is what being on it means — so
-   * this is the only way to reach qits-idp, qits-ci or this component's own row at all.
+   * this is the only way to reach qits-platform-idp, qits-ci or this component's own row at all.
    *
    * **The filter is here rather than on the page**, and the page is the poorer for knowing less:
    * the listing carries both planes and the server offers no `?target=`, so somewhere has to drop

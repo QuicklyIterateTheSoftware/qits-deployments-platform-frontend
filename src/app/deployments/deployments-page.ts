@@ -78,11 +78,11 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * explorer, whose run listing
  * takes a mandatory repository filter and therefore cannot see its own orphans without one.
  *
- * **The platform plane is a root of its own, beside the projects.** An application deployed once for
- * the whole platform — qits-idp, qits-ci, this component — belongs to no environment, so no project
- * and no tier can lead to it: reading this page through the projects alone showed three of the
- * platform's eleven applications and gave no hint the other eight existed. It is drawn as a third
- * root rather than folded into every environment because it is not in any of them; `GET
+ * **The platform plane is a root of its own, beside the projects.** An application deployed once
+ * for the whole platform — qits-platform-idp, qits-ci, this component — belongs to no environment,
+ * so no project and no tier can lead to it: reading this page through the projects alone showed
+ * three of the platform's eleven applications and gave no hint the other eight existed. It is drawn
+ * as a third root rather than folded into every environment because it is not in any of them; `GET
  * /applications` is the flat listing that reaches it and `?environmentId=platform` is its
  * deployment history.
  *
@@ -277,7 +277,7 @@ export class DeploymentsPage {
    * `following 2 planes`, and only while there is something to follow.
    *
    * "Plane" rather than "environment" because the platform is one of the things that can be
-   * followed and is not an environment — a self-update of qits-platform-deployments is exactly the
+   * followed and is not an environment — a self-update of qits-deployments is exactly the
    * deployment a reader watches this line for.
    */
   protected readonly following = computed(() => {
@@ -465,13 +465,13 @@ export class DeploymentsPage {
   }
 
   /**
-   * The sentence for a project whose slug names nothing in qits-platform-deployments. It quotes
-   * the *slug*, not the project's display name, because the slug is what the convention actually
-   * compares — an operator chasing this reads it against
-   * `GET /platform-deployments/api/environments` and the two have to be the same string.
+   * The sentence for a project whose slug names nothing in qits-deployments. It quotes the *slug*,
+   * not the project's display name, because the slug is what the convention actually compares — an
+   * operator chasing this reads it against `GET /platform-deployments/api/environments` and the two
+   * have to be the same string.
    */
   protected noEnvironmentMessage(project: ProjectDto): string {
-    return `No environment named "${project.slug}" exists in qits-platform-deployments.`;
+    return `No environment named "${project.slug}" exists in qits-deployments.`;
   }
 
   /** The bucket's own count, drawn whether or not there is anything in it. */

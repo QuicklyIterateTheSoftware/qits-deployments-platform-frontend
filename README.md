@@ -1,7 +1,7 @@
 # QitsSpaCd
 
-The CD explorer: the read-only view of what is deployed where, served by qits-platform-deployments
-itself at `/platform-deployments/` through Quinoa. One screen, no forms, no writes.
+The CD explorer: the read-only view of what is deployed where, served by qits-deployments itself at
+`/platform-deployments/` through Quinoa. One screen, no forms, no writes.
 
 - **`/platform-deployments/`** — deployments by project. Projects (from qits-projects) → the cd
   environment each project's slug names → a table of that environment's applications and what is
@@ -20,13 +20,13 @@ both orphan sets are a client-side difference.
 A row's current deployment is the newest row for that application in a list the service already
 sorted newest first; everything behind it is history and lives behind the row's own expansion,
 together with the deployment's `detail` clob and its exact timestamps. There is no detail route,
-because a deployment row already carries everything qits-platform-deployments knows. Where a
-deployment carries a `runId` the commit cell links to `/ci/runs/<runId>` — a plain `href`, because
-that is another application behind the same gateway and this SPA's router owns nothing outside
+because a deployment row already carries everything qits-deployments knows. Where a deployment
+carries a `runId` the commit cell links to `/ci/runs/<runId>` — a plain `href`, because that is
+another application behind the same gateway and this SPA's router owns nothing outside
 `/platform-deployments/`.
 
-The base path is `/platform-deployments/` — the segment qits-platform-deployments serves this app
-at. It is spelled in four places that must agree, three of them in that service
+The base path is `/platform-deployments/` — the segment qits-deployments serves this app at. It is
+spelled in four places that must agree, three of them in that service
 (`quarkus.quinoa.ui-root-path`, `quarkus.rest.path`, `quarkus.http.non-application-root-path`) and
 the fourth here, in `angular.json`'s `baseHref`. The repository, the package and the type names
 still say `cd`; only paths moved.

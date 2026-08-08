@@ -80,11 +80,16 @@ describe('CdApi', () => {
     const applications = api.platformApplications();
     http.expectOne('/platform-deployments/api/applications').flush({
       applications: [
-        { id: 'platform:qits-idp', repoId: 'qits-idp', name: 'qits-idp', target: 'PLATFORM' },
+        {
+          id: 'platform:qits-platform-idp',
+          repoId: 'qits-platform-idp',
+          name: 'qits-platform-idp',
+          target: 'PLATFORM',
+        },
         { id: 'e1:qits-stt', repoId: 'qits-stt', name: 'qits-stt', target: 'ENVIRONMENT' },
       ],
     });
-    await expect(applications).resolves.toMatchObject([{ id: 'platform:qits-idp' }]);
+    await expect(applications).resolves.toMatchObject([{ id: 'platform:qits-platform-idp' }]);
   });
 
   it('asks for the platform plane by name where an environment id goes', async () => {

@@ -8,8 +8,8 @@ import { RouterLink } from '@angular/router';
  * behaviour of handing the URL back to the gateway: that is the landing page's job, and it is
  * correct only because spa-home is mounted at the root, where an unknown first segment is another
  * micro frontend rather than a typo. Here the segment is already ours — the gateway routed
- * `/platform-deployments/…` to qits-platform-deployments on purpose — so there is nobody to hand
- * it to, and bouncing it back would be a loop.
+ * `/platform-deployments/…` to qits-deployments on purpose — so there is nobody to hand it to, and
+ * bouncing it back would be a loop.
  */
 @Component({
   selector: 'app-not-found',

@@ -1,11 +1,10 @@
 /**
  * The small conversions the page needs, kept out of the template so they can be asserted directly.
  *
- * Every timestamp is rendered in **UTC**. qits-platform-deployments stamps `Instant`s, an operator
- * reading this table is usually reading a log line beside it, and a browser-local rendering would
- * make two people
- * looking at the same deployment disagree about when it happened. The `Z` on the long form says so
- * out loud.
+ * Every timestamp is rendered in **UTC**. qits-deployments stamps `Instant`s, an operator reading
+ * this table is usually reading a log line beside it, and a browser-local rendering would make two
+ * people looking at the same deployment disagree about when it happened. The `Z` on the long form
+ * says so out loud.
  *
  * Copied from qits-spa-ci's `format.ts` and trimmed to what this screen draws — the ci-only pieces
  * (ANSI stripping, the repository-url basename) have no caller here, and carrying them across would
