@@ -88,6 +88,15 @@ export interface CdEnvironmentDto {
   readonly name: string;
   readonly branch: string;
   readonly network: string;
+  /**
+   * True on exactly one environment: the tier whose branch deploys the platform plane.
+   *
+   * It says nothing about what this environment *holds* — a platform service is in every
+   * environment either way, which is why the platform bucket is a root of its own and not this
+   * tier's child. What it decides is which branch is allowed to roll the plane, and that is worth
+   * drawing: it is the answer to "why did my release of qits-platform-idp ship nothing".
+   */
+  readonly platform: boolean;
   readonly createdAt: string;
   readonly applications: readonly CdApplicationDto[] | null;
 }

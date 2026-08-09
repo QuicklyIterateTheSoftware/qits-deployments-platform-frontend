@@ -194,6 +194,15 @@ export class DeploymentsPage {
     return this.environmentList().filter((environment) => !slugs.has(environment.name));
   });
 
+  /**
+   * The tier whose branch deploys the platform plane, or null while the environments are loading
+   * and when none is designated. Exactly one row carries the flag; `find` rather than a lookup
+   * because the server holds that invariant, not this client.
+   */
+  protected readonly platformEnvironment = computed(
+    () => this.environmentList().find((environment) => environment.platform) ?? null,
+  );
+
   /** Both roots failed: there is no page to draw around that gap. */
   protected readonly unrecoverable = computed(
     () => this.projects().kind === 'error' && this.environments().kind === 'error',
@@ -456,12 +465,13 @@ export class DeploymentsPage {
     }
     const environment = this.environmentOf(project);
     return environment
-      ? `environment "${environment.name}" · ${environment.branch} · network ${environment.network}`
+      ? `environment "${environment.name}" · ${this.environmentMeta(environment)}`
       : 'no environment';
   }
 
   protected environmentMeta(environment: CdEnvironmentDto): string {
-    return `${environment.branch} · network ${environment.network}`;
+    const meta = `${environment.branch} · network ${environment.network}`;
+    return environment.platform ? `${meta} · platform environment` : meta;
   }
 
   /**
@@ -484,14 +494,27 @@ export class DeploymentsPage {
    * The platform bucket's count, and only once it has been read. A closed bucket has asked nothing,
    * so there is no number to draw — and inventing one would be the same lie as a table full of
    * "never deployed".
+   *
+   * The branch is drawn whether or not the bucket has been opened, because it is the one fact about
+   * this root that is not in the table: a platform service ships when the platform environment's
+   * branch is built and on no other, so "deployed from environment/prod" is what explains an empty
+   * or a stale table. Absent while the environments are still loading, and absent — pointedly — when
+   * no environment is designated at all, which is a state in which nothing here can deploy.
    */
   protected platformMeta(): string {
+    const parts: string[] = [];
     const state = this.applications().get(PLATFORM_PLANE);
-    if (state?.kind !== 'ready') {
-      return '';
+    if (state?.kind === 'ready') {
+      const count = state.value.length;
+      parts.push(`${count} ${count === 1 ? 'service' : 'services'}`);
     }
-    const count = state.value.length;
-    return `${count} ${count === 1 ? 'service' : 'services'}`;
+    const platform = this.platformEnvironment();
+    if (platform) {
+      parts.push(`deployed from ${platform.branch}`);
+    } else if (this.environments().kind === 'ready') {
+      parts.push('no platform environment — nothing here can deploy');
+    }
+    return parts.join(' · ');
   }
 
   protected toggleBucket(): void {

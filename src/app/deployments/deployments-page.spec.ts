@@ -30,13 +30,19 @@ describe('DeploymentsPage', () => {
     dns: null,
   });
 
-  const environment = (id: string, name: string): CdEnvironmentDto => ({
+  const environment = (
+    id: string,
+    name: string,
+    over: Partial<CdEnvironmentDto> = {},
+  ): CdEnvironmentDto => ({
     id,
     name,
     branch: 'main',
     network: 'qits-net',
+    platform: false,
     createdAt: '2026-07-01T00:00:00Z',
     applications: null,
+    ...over,
   });
 
   const application = (
@@ -306,6 +312,29 @@ describe('DeploymentsPage', () => {
     // And the never-deployed claim holds on this plane too, for the same reason.
     expect(text()).toContain('qits-ci');
     expect(text()).toContain('never deployed');
+  });
+
+  it('names the branch the platform plane deploys from, and says so when there is none', async () => {
+    // The one fact about this root that is not in its table: a platform service ships when the
+    // platform environment's branch is built and on no other. It is what explains a stale table,
+    // and it is drawn before the bucket is opened because that is when the question is asked.
+    await open();
+    await flushRoots(
+      [project('p1', 'qits', 'qits')],
+      [environment('e1', 'qits', { branch: 'environment/prod', platform: true })],
+    );
+
+    expect(text()).toContain('deployed from environment/prod');
+    expect(text()).toContain('platform environment');
+  });
+
+  it('says nothing can deploy when no environment is the platform one', async () => {
+    // Reachable on a half-bootstrapped install, and silent everywhere else: a platform build would
+    // register nothing and report no error, so this page is where it shows.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    expect(text()).toContain('no platform environment');
   });
 
   it('keeps the tiered entries of the flat catalogue out of the platform bucket', async () => {
