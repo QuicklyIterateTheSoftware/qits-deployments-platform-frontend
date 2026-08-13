@@ -241,7 +241,7 @@ describe('DeploymentsPage', () => {
     );
 
     expect(text()).toContain('qits-ci');
-    expect(text()).toContain('ACTIVE');
+    expect(text()).toContain('Active');
     expect(text()).toContain('9f2c1ab');
     expect(text()).toContain('qits-ci-9f2c1ab');
     expect(text()).toContain('31 Jul 14:09');
@@ -288,7 +288,7 @@ describe('DeploymentsPage', () => {
     await flushEnvironment('e9', [application('a9', 'qits-spike')], [deployment('d9', 'a9')]);
 
     expect(text()).toContain('qits-spike');
-    expect(text()).toContain('ACTIVE');
+    expect(text()).toContain('Active');
   });
 
   it('names the platform plane on arrival, asks nothing about it, and draws it on a click', async () => {
@@ -308,7 +308,7 @@ describe('DeploymentsPage', () => {
 
     expect(text()).toContain('2 services');
     expect(text()).toContain('qits-platform-idp');
-    expect(text()).toContain('ACTIVE');
+    expect(text()).toContain('Active');
     // And the never-deployed claim holds on this plane too, for the same reason.
     expect(text()).toContain('qits-ci');
     expect(text()).toContain('never deployed');
@@ -397,13 +397,13 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('aa71903');
     // History is behind the affordance, not beside the current row.
     expect(text()).not.toContain('1de0447');
-    expect(text()).not.toContain('DECOMMISSIONED');
+    expect(text()).not.toContain('Decommissioned');
 
     await click('qits-ci');
 
     expect(text()).toContain('1 earlier deployment');
     expect(text()).toContain('1de0447');
-    expect(text()).toContain('DECOMMISSIONED');
+    expect(text()).toContain('Decommissioned');
     // The expansion is also where the deployment says what happened to it.
     expect(text()).toContain('31 Jul 2026 15:21:00Z');
   });
@@ -425,7 +425,7 @@ describe('DeploymentsPage', () => {
       ],
     );
 
-    expect(text()).toContain('IMAGE_MISSING');
+    expect(text()).toContain('Image missing');
     expect(text()).not.toContain('manifest unknown');
 
     await click('qits-stt');
@@ -563,7 +563,7 @@ describe('DeploymentsPage', () => {
     expectDeployments('e1').flush({ deployments: [deployment('d1', 'a1', { status: 'ACTIVE' })] });
     await settle();
 
-    expect(text()).toContain('ACTIVE');
+    expect(text()).toContain('Active');
     expect(text()).not.toContain('following');
 
     await tick(POLL_INTERVAL_MS * 4);
@@ -595,7 +595,7 @@ describe('DeploymentsPage', () => {
     expectDeployments('e1').flush({ deployments: [deployment('d1', 'a1', { status: 'ACTIVE' })] });
     await settle();
 
-    expect(text()).toContain('ACTIVE');
+    expect(text()).toContain('Active');
   });
 
   it('keeps the last good table on screen when a poll fails, and says so', async () => {
@@ -615,7 +615,7 @@ describe('DeploymentsPage', () => {
     await settle();
 
     expect(text()).toContain('The last refresh failed — 503');
-    expect(text()).toContain('STARTING');
+    expect(text()).toContain('Starting');
   });
 
   it('carries expansion in the URL, so it is bookmarkable and pressing back collapses it', async () => {

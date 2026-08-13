@@ -26,9 +26,22 @@
 /**
  * A deployment's state. `QUEUED` and `STARTING` are the two non-terminal ones, and that is the
  * whole rule behind Decision 5's poll — everything else sits still for days.
+ *
+ * The last three are outcomes the server settles a row into *after* the deployment itself is over,
+ * which is why none of them is in flight: `ROLLED_BACK` is an update that failed onto a predecessor
+ * that kept serving, `SUPERSEDED` an interrupted attempt a newer deployment overtook, and `GONE` a
+ * row that was serving until its container vanished under it.
  */
 export type CdDeploymentStatus =
-  'QUEUED' | 'STARTING' | 'ACTIVE' | 'IMAGE_MISSING' | 'FAILED' | 'DECOMMISSIONED';
+  | 'QUEUED'
+  | 'STARTING'
+  | 'ACTIVE'
+  | 'IMAGE_MISSING'
+  | 'ROLLED_BACK'
+  | 'FAILED'
+  | 'GONE'
+  | 'DECOMMISSIONED'
+  | 'SUPERSEDED';
 
 /** The statuses a poll is waiting on. Anything else is settled. */
 const IN_FLIGHT: readonly CdDeploymentStatus[] = ['QUEUED', 'STARTING'];
