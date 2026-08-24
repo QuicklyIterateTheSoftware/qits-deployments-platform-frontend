@@ -137,16 +137,17 @@ interface Row {
                 </td>
                 <td class="commit">
                   @if (row.current; as deployment) {
-                    @if (deployment.runId) {
-                      <!--
-                        A plain href, never a routerLink: qits-ci is a different application on a
-                        host of its own, and routing to it in-app would hand the URL to this SPA's
-                        router, which owns nothing outside this host. QitsAppLinks turns the
-                        platform's own navigation into that address, falling back to the old
-                        /ci/ segment for as long as qits-ci has no host of its own.
-                      -->
+                    <!--
+                      A plain href, never a routerLink: qits-ci is a different application on a
+                      host of its own, and routing to it in-app would hand the URL to this SPA's
+                      router, which owns nothing outside this host. QitsAppLinks turns the
+                      platform's own navigation into that address — and a row with no run, or a
+                      platform that names no ci host, draws the sha as text instead of as a link
+                      to nowhere.
+                    -->
+                    @if (deployment.runId && runHref(deployment.runId); as href) {
                       <a
-                        [href]="runHref(deployment.runId)"
+                        [href]="href"
                         [title]="deployment.commitSha + ' — built by ci run ' + deployment.runId"
                       >
                         {{ shortSha(deployment.commitSha) }}
@@ -198,12 +199,10 @@ interface Row {
                         @for (deployment of row.history; track deployment.id) {
                           <li>
                             <app-status-badge [status]="deployment.status" />
-                            @if (deployment.runId) {
-                              <a
-                                [href]="runHref(deployment.runId)"
-                                [title]="deployment.commitSha"
-                                >{{ shortSha(deployment.commitSha) }}</a
-                              >
+                            @if (deployment.runId && runHref(deployment.runId); as href) {
+                              <a [href]="href" [title]="deployment.commitSha">{{
+                                shortSha(deployment.commitSha)
+                              }}</a>
                             } @else {
                               <code [title]="deployment.commitSha">{{
                                 shortSha(deployment.commitSha)
@@ -357,13 +356,12 @@ export class DeploymentTable {
    * Where a run lives, as an absolute URL into qits-ci.
    *
    * The address is the platform's answer and not a constant: qits-ci is served at the root of its
-   * own host once it has one, and under `/ci/` on the environment origin until then. The old
-   * segment is the fallback, so a build of this page released ahead of that flip still links
-   * somewhere real. With no navigation at all there is no honest address, and the link is dropped
-   * rather than guessed at.
+   * own host, and the navigation is what says where that host is. A platform naming qits-ci
+   * nowhere gives no honest address, and the sha is then drawn as text rather than as a link to
+   * nowhere.
    */
   protected runHref(runId: string): string | undefined {
-    return this.appLinks.href('qits-ci', `runs/${runId}`, undefined, '/ci/');
+    return this.appLinks.href('qits-ci', `runs/${runId}`);
   }
 
   /**
