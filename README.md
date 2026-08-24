@@ -1,13 +1,24 @@
 # QitsSpaCd
 
 The CD explorer: the read-only view of what is deployed where, served by qits-deployments itself at
-`/platform-deployments/` through Quinoa. One screen, no forms, no writes.
+the root of `deployments.<env>.<domain>` through Quinoa. One screen, no forms, no writes.
 
-- **`/platform-deployments/`** — deployments by project. Projects (from qits-projects) → the cd
+- **`/`** (and `/<projectSlug>/`) — deployments by project. Projects (from qits-projects) → the cd
   environment each project's slug names → a table of that environment's applications and what is
   currently deployed on each. The page itself makes two requests, both flat lists; expanding a
-  project costs two more and caches. Expansion is carried in the query parameters
-  (`/platform-deployments/?project=…`), so it is bookmarkable and the back button collapses.
+  project costs two more and caches. Expansion is carried in the query parameters (`?project=…`),
+  so it is bookmarkable and the back button collapses.
+
+## The project in the address
+
+This app is **project scoped**: `/qits` is the same page as `/`, with the address stating which
+project the reader is inside. That does one visible thing — it **seeds the expansion**, so the
+scoped project's row is already open on arrival. It is a seed and not an override: `?project=` is
+still the reader's statement, and a scoped row can be collapsed like any other (collapsing the last
+one writes an empty `?project=`, which is what stops the seed reopening it).
+
+The scope is read from the address by `@qits/ui-components` (`provideQitsScope('project')`), never
+from a route parameter, so one component serves both forms.
 
 The project → environment edge is **`CdEnvironment.name === Project.slug`, and it is convention
 only** — no column links the two services. So the page draws a match, never a foreign key, and shows
@@ -21,19 +32,16 @@ A row's current deployment is the newest row for that application in a list the 
 sorted newest first; everything behind it is history and lives behind the row's own expansion,
 together with the deployment's `detail` clob and its exact timestamps. There is no detail route,
 because a deployment row already carries everything qits-deployments knows. Where a deployment
-carries a `runId` the commit cell links to `/ci/runs/<runId>` — a plain `href`, because that is
-another application behind the same gateway and this SPA's router owns nothing outside
-`/platform-deployments/`.
+carries a `runId` the commit cell links to qits-ci's run page — a plain `href`, because that is
+another application on a host of its own and this SPA's router owns nothing outside this one. The
+address comes from `QitsAppLinks`, which reads the platform's own navigation, and falls back to the
+old `/ci/` segment on the environment origin for as long as qits-ci has no host of its own.
 
-The base path is `/platform-deployments/` — the segment qits-deployments serves this app at. It is
-spelled in four places that must agree, three of them in that service
-(`quarkus.quinoa.ui-root-path`, `quarkus.rest.path`, `quarkus.http.non-application-root-path`) and
-the fourth here, in `angular.json`'s `baseHref`. The repository, the package and the type names
-still say `cd`; only paths moved.
-
-**One `/cd/` is left, and it is not ours.** `@qits/ui-components` still points its `CD` navigation
-entry at `/cd/`, so no link is marked current in this app's sidebar until that entry moves. The fix
-is one line in qits-spa-ui-components, and this app picks it up on its next release-train bump.
+The base path is `/`: qits-deployments serves this app at the root of its own host, so `baseHref`
+here spells no segment at all. The `/platform-deployments` segment survives only as that service's
+wire prefix, in three of its keys (`quarkus.quinoa.ignored-path-prefixes`, `quarkus.rest.path`,
+`quarkus.http.non-application-root-path`) and its `routes:` line — all of them in that repository.
+The repository, the package and the type names still say `cd`; only paths moved.
 
 The page polls only while a visible deployment is `QUEUED` or `STARTING`, every five seconds, and
 stops on the first settled answer; a hidden tab polls nothing. A settled table is refreshed by the
@@ -54,10 +62,11 @@ ng serve
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
 
-`proxy.conf.json` forwards `/platform-deployments/api` and `/projects/api` to a gateway on
-`localhost:8080`, because `ng serve` puts no gateway in front and the screen reads across two
-services. In a deployment every call is a same-origin path behind the real gateway, which is what
-carries the session cookie.
+`proxy.conf.json` forwards `/platform-deployments/api`, `/projects/api` and `/main-navigation` to
+an edge on `localhost:8080`, because `ng serve` puts no edge in front and the screen reads across
+two services. In a deployment every call is a same-origin path on this service's own host — the
+edge path-routes every application's segment on every vhost — which is what carries the session
+cookie.
 
 ## Code scaffolding
 

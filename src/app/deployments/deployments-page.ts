@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { QitsButton } from '@qits/ui-components';
+import { QITS_SCOPE, QitsButton } from '@qits/ui-components';
 import { CdApi } from '../api/cd-api';
 import {
   PLATFORM_PLANE,
@@ -21,6 +21,7 @@ import {
   type ProjectDto,
 } from '../api/dto';
 import { ProjectsApi } from '../api/projects-api';
+import { injectScopedProject } from '../nav/scoped-project';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { LOADING, describeError, failed, ready, type Loadable } from '../ui/loadable';
@@ -107,6 +108,16 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
   styleUrl: './deployments-page.css',
 })
 export class DeploymentsPage {
+  /** The project the address names — what the header says, and what the table opens on arrival. */
+  protected readonly scoped = injectScopedProject();
+
+  /**
+   * The scoped project's **id**, which is what the expansion is keyed by. The address carries the
+   * slug; the library resolves it against the project list, so this is `undefined` until that list
+   * answers and the row opens when it does.
+   */
+  private readonly scopeSource = inject(QITS_SCOPE, { optional: true });
+
   private readonly projectsApi = inject(ProjectsApi);
   private readonly cdApi = inject(CdApi);
   private readonly router = inject(Router);
@@ -166,7 +177,20 @@ export class DeploymentsPage {
     initialValue: convertToParamMap({}),
   });
 
-  protected readonly expandedProjects = computed(() => idSet(this.queryParams().get('project')));
+  /**
+   * Which project rows are open: what `?project=` names, plus the project the address scopes.
+   *
+   * The scope is a **seed** and not an override — `?project=` is still the reader's statement, and
+   * a scoped project can be collapsed like any other. What makes that work is `navigate` below,
+   * which writes an empty `?project=` rather than dropping the parameter while a scope is in force:
+   * an absent parameter would let the seed put the row straight back.
+   */
+  protected readonly expandedProjects = computed(() => {
+    const named = idSet(this.queryParams().get('project'));
+    const scoped = this.scopeSource?.projectId();
+    if (!scoped || this.queryParams().has('project')) return named;
+    return new Set([...named, scoped]);
+  });
   protected readonly expandedEnvironments = computed(() => idSet(this.queryParams().get('env')));
 
   protected readonly projectList = computed(() => {
@@ -539,9 +563,14 @@ export class DeploymentsPage {
    * disappears rather than lingering as `?project=`.
    */
   private navigate(key: 'project' | 'env', ids: ReadonlySet<string>): void {
+    // An empty set normally drops the parameter, which keeps the address clean. The one exception
+    // is a collapsed project list under a project scope: there the absent parameter reads as "no
+    // statement" and the scope's seed would reopen the row the reader just closed. An empty value
+    // is the statement that nothing is open.
+    const empty = key === 'project' && this.scopeSource?.projectId() ? '' : null;
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { [key]: ids.size > 0 ? [...ids].join(',') : null },
+      queryParams: { [key]: ids.size > 0 ? [...ids].join(',') : empty },
       queryParamsHandling: 'merge',
     });
   }

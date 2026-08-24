@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { injectScopedProject } from '../nav/scoped-project';
+
 /**
  * A URL under `/platform-deployments/` that this app does not recognise.
  *
@@ -20,7 +22,7 @@ import { RouterLink } from '@angular/router';
     <p>
       This is the CD explorer. It has one screen — what is deployed, by project — and nothing else.
     </p>
-    <p><a routerLink="/">Back to the deployments</a></p>
+    <p><a [routerLink]="scoped.commands()">Back to the deployments</a></p>
   `,
   styles: `
     h1 {
@@ -29,4 +31,7 @@ import { RouterLink } from '@angular/router';
     }
   `,
 })
-export class NotFound {}
+export class NotFound {
+  /** Back to the table the reader came from — the project's, where the address named one. */
+  protected readonly scoped = injectScopedProject();
+}

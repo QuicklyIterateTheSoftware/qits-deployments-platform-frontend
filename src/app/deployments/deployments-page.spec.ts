@@ -4,6 +4,7 @@ import { provideLocationMocks } from '@angular/common/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { provideQitsNavigationTree } from '@qits/ui-components';
 import { routes } from '../app.routes';
 import type { CdApplicationDto, CdDeploymentDto, CdEnvironmentDto, ProjectDto } from '../api/dto';
 import { POLL_INTERVAL_MS } from './deployments-page';
@@ -18,6 +19,9 @@ import { POLL_INTERVAL_MS } from './deployments-page';
  * environment. And **the poll that stops**, because a poll that does not stop is invisible in
  * review: the table looks right and the tab re-reads a settled deployment list forever.
  */
+/** Where the environment itself is served, as the navigation states it. */
+const ENVIRONMENT_ORIGIN = 'https://dev.example.com';
+
 describe('DeploymentsPage', () => {
   let http: HttpTestingController;
   let harness: RouterTestingHarness;
@@ -97,6 +101,10 @@ describe('DeploymentsPage', () => {
         provideLocationMocks(),
         provideHttpClient(),
         provideHttpClientTesting(),
+        // The platform's own navigation, from a literal so nothing is fetched. The environment
+        // origin is what turns the ci link below into an address: qits-ci has no host of its own in
+        // this fixture, so the link falls back to its segment under that origin.
+        provideQitsNavigationTree({ origin: ENVIRONMENT_ORIGIN, links: [] }),
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -446,16 +454,17 @@ describe('DeploymentsPage', () => {
       ],
     );
 
-    // A plain href across applications: /ci/ is another SPA behind the same gateway, and this
-    // app's router owns nothing outside /platform-deployments/.
+    // A plain href across applications: qits-ci is another SPA on a host of its own, and this app's
+    // router owns nothing outside this host. The address comes from the platform's navigation —
+    // here the environment origin plus qits-ci's old segment, because this fixture gives it no host.
     const link = page().querySelector<HTMLAnchorElement>(
-      'a[href="/ci/runs/da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61"]',
+      `a[href="${ENVIRONMENT_ORIGIN}/ci/runs/da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61"]`,
     );
     expect(link).not.toBeNull();
     expect(link?.getAttribute('title')).toContain('9f2c1ab3d4e5f6');
 
     // The row with no runId — every row written before cd recorded it — is a plain sha.
-    expect(page().querySelectorAll('a[href^="/ci/runs/"]')).toHaveLength(1);
+    expect(page().querySelectorAll(`a[href^="${ENVIRONMENT_ORIGIN}/ci/runs/"]`)).toHaveLength(1);
     expect(text()).toContain('9f2c1ab');
   });
 
