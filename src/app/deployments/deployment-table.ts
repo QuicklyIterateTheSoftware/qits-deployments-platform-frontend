@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import { QitsAppLinks } from '@qits/ui-components';
 import type { CdApplicationDto, CdDeploymentDto } from '../api/dto';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
@@ -130,13 +139,14 @@ interface Row {
                   @if (row.current; as deployment) {
                     @if (deployment.runId) {
                       <!--
-                        A plain href, never a routerLink: /ci/ is a different application served by
-                        a different service behind the same gateway, and routing to it in-app would
-                        hand the URL to this SPA's router, which owns nothing outside
-                        /platform-deployments/.
+                        A plain href, never a routerLink: qits-ci is a different application on a
+                        host of its own, and routing to it in-app would hand the URL to this SPA's
+                        router, which owns nothing outside this host. QitsAppLinks turns the
+                        platform's own navigation into that address, falling back to the old
+                        /ci/ segment for as long as qits-ci has no host of its own.
                       -->
                       <a
-                        [href]="'/ci/runs/' + deployment.runId"
+                        [href]="runHref(deployment.runId)"
                         [title]="deployment.commitSha + ' — built by ci run ' + deployment.runId"
                       >
                         {{ shortSha(deployment.commitSha) }}
@@ -190,7 +200,7 @@ interface Row {
                             <app-status-badge [status]="deployment.status" />
                             @if (deployment.runId) {
                               <a
-                                [href]="'/ci/runs/' + deployment.runId"
+                                [href]="runHref(deployment.runId)"
                                 [title]="deployment.commitSha"
                                 >{{ shortSha(deployment.commitSha) }}</a
                               >
@@ -340,6 +350,21 @@ export class DeploymentTable {
   protected readonly formatDuration = formatDuration;
   protected readonly formatAge = formatAge;
   protected readonly none = NONE;
+
+  private readonly appLinks = inject(QitsAppLinks);
+
+  /**
+   * Where a run lives, as an absolute URL into qits-ci.
+   *
+   * The address is the platform's answer and not a constant: qits-ci is served at the root of its
+   * own host once it has one, and under `/ci/` on the environment origin until then. The old
+   * segment is the fallback, so a build of this page released ahead of that flip still links
+   * somewhere real. With no navigation at all there is no honest address, and the link is dropped
+   * rather than guessed at.
+   */
+  protected runHref(runId: string): string | undefined {
+    return this.appLinks.href('qits-ci', `runs/${runId}`, undefined, '/ci/');
+  }
 
   /**
    * The age column ticks off a local clock rather than a poll. Everything the server can change

@@ -1,6 +1,9 @@
 <header class="head">
   <div>
     <h1>Deployments</h1>
+    @if (scoped.name(); as project) {
+      <p class="project-scope">{{ project }}</p>
+    }
     <p class="lede">Current deployments by project. {{ summary() }}</p>
   </div>
   <div class="actions">

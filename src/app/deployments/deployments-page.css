@@ -32,6 +32,15 @@ h1 {
   color: #6b7280;
 }
 
+/* The project the address names, under the heading. It says what is in scope, and the table opens
+   that project's row; it narrows nothing else, because every environment is still listed. */
+.project-scope {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4338ca;
+}
+
 .page-error,
 .banner {
   display: flex;
