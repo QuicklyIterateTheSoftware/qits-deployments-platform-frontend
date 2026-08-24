@@ -4,7 +4,7 @@ import { provideLocationMocks } from '@angular/common/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { provideQitsNavigationTree } from '@qits/ui-components';
+import { provideQitsNavigationTree, type QitsNavigation } from '@qits/ui-components';
 import { routes } from '../app.routes';
 import type { CdApplicationDto, CdDeploymentDto, CdEnvironmentDto, ProjectDto } from '../api/dto';
 import { POLL_INTERVAL_MS } from './deployments-page';
@@ -21,6 +21,21 @@ import { POLL_INTERVAL_MS } from './deployments-page';
  */
 /** Where the environment itself is served, as the navigation states it. */
 const ENVIRONMENT_ORIGIN = 'https://dev.example.com';
+
+/** Where qits-ci is served: its own host, which is the only address a run link can have. */
+const CI_ORIGIN = 'https://ci.dev.example.com';
+
+/** The platform as the edge states it, with qits-ci on its host or named nowhere at all. */
+function navigation(ci: boolean): QitsNavigation {
+  return {
+    origin: ENVIRONMENT_ORIGIN,
+    slots: {
+      'services.details': ci
+        ? [{ app: 'qits-ci', label: 'CI', host: 'ci', origin: CI_ORIGIN, path: '/ci' }]
+        : [],
+    },
+  };
+}
 
 describe('DeploymentsPage', () => {
   let http: HttpTestingController;
@@ -94,21 +109,21 @@ describe('DeploymentsPage', () => {
     ...over,
   });
 
-  beforeEach(() => {
+  /** The platform's own navigation, from a literal so nothing is fetched. */
+  function configure(tree: QitsNavigation): void {
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes),
         provideLocationMocks(),
         provideHttpClient(),
         provideHttpClientTesting(),
-        // The platform's own navigation, from a literal so nothing is fetched. The environment
-        // origin is what turns the ci link below into an address: qits-ci has no host of its own in
-        // this fixture, so the link falls back to its segment under that origin.
-        provideQitsNavigationTree({ origin: ENVIRONMENT_ORIGIN, links: [] }),
+        provideQitsNavigationTree(tree),
       ],
     });
     http = TestBed.inject(HttpTestingController);
-  });
+  }
+
+  beforeEach(() => configure(navigation(true)));
 
   afterEach(() => {
     vi.useRealTimers();
@@ -455,17 +470,40 @@ describe('DeploymentsPage', () => {
     );
 
     // A plain href across applications: qits-ci is another SPA on a host of its own, and this app's
-    // router owns nothing outside this host. The address comes from the platform's navigation —
-    // here the environment origin plus qits-ci's old segment, because this fixture gives it no host.
+    // router owns nothing outside this host. The address comes from the platform's navigation.
     const link = page().querySelector<HTMLAnchorElement>(
-      `a[href="${ENVIRONMENT_ORIGIN}/ci/runs/da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61"]`,
+      `a[href="${CI_ORIGIN}/runs/da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61"]`,
     );
     expect(link).not.toBeNull();
     expect(link?.getAttribute('title')).toContain('9f2c1ab3d4e5f6');
 
     // The row with no runId — every row written before cd recorded it — is a plain sha.
-    expect(page().querySelectorAll(`a[href^="${ENVIRONMENT_ORIGIN}/ci/runs/"]`)).toHaveLength(1);
+    expect(page().querySelectorAll(`a[href^="${CI_ORIGIN}/runs/"]`)).toHaveLength(1);
     expect(text()).toContain('9f2c1ab');
+  });
+
+  /**
+   * A platform naming no ci application leaves the sha as text.
+   *
+   * There is nothing to fall back on: every service is on a host of its own, so a `/ci/` segment
+   * under the environment origin is not an address, and an anchor with no href is a link to
+   * nowhere.
+   */
+  it('draws the sha as text when the platform names no ci application', async () => {
+    TestBed.resetTestingModule();
+    configure(navigation(false));
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', { runId: 'da4a3f0e-11c2-4f7a-9b03-2ee45c1f8d61' })],
+    );
+
+    expect(page().querySelector('td.commit a')).toBeNull();
+    expect(page().querySelector('td.commit code')?.textContent).toContain('9f2c1ab');
   });
 
   it('collapses a failed expansion to one retry on that row, and retries it in place', async () => {
