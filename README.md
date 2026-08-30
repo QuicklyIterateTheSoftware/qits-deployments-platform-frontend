@@ -1,4 +1,4 @@
-# QitsSpaCd
+# qits-deployments-platform-frontend
 
 The CD explorer: the read-only view of what is deployed where, served by qits-deployments itself at
 the root of `deployments.<env>.<domain>` through Quinoa. One screen, no forms, no writes.
@@ -41,7 +41,7 @@ The base path is `/`: qits-deployments serves this app at the root of its own ho
 here spells no segment at all. The `/platform-deployments` segment survives only as that service's
 wire prefix, in three of its keys (`quarkus.quinoa.ignored-path-prefixes`, `quarkus.rest.path`,
 `quarkus.http.non-application-root-path`) and its `routes:` line — all of them in that repository.
-The repository, the package and the type names still say `cd`; only paths moved.
+The Angular project, the package and the type names still say `cd`; only paths moved.
 
 The page polls only while a visible deployment is `QUEUED` or `STARTING`, every five seconds, and
 stops on the first settled answer; a hidden tab polls nothing. A settled table is refreshed by the
@@ -49,7 +49,7 @@ button and by nothing else.
 
 `src/app/api/` holds hand-written interfaces mirroring the two services' wire shapes, one injectable
 service each, over `HttpClient` on the fetch backend. Nothing is generated, and nothing is shared
-with qits-spa-ci: the duplication is the deliberate alternative to putting transport into a
+with qits-ci-frontend: the duplication is the deliberate alternative to putting transport into a
 components library that six SPAs consume without making a request.
 
 ## Development server
