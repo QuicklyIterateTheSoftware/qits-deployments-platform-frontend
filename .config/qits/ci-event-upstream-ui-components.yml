@@ -69,5 +69,9 @@ steps:
       fi
       git -c user.name="qits release train" -c user.email="release-train@qits.local" \
           commit -q -m "bump(@qits/ui-components@$version): follow the $upstream release"
-      git push --force "$QITS_CI_REPOSITORY_URL" "HEAD:refs/heads/maintenance/$upstream"
+      # The branch is a CONSTANT, not the event payload's `repository`. That field is the storage
+      # id, an opaque UUID since the identity cutover, so the branch it named read
+      # maintenance/bb84fea1-… — unreadable, and a different one per push if an id ever moves. This
+      # file is about exactly one upstream (@qits/ui-components), so its branch says so outright.
+      git push --force "$QITS_CI_REPOSITORY_URL" "HEAD:refs/heads/maintenance/ui-components"
 
