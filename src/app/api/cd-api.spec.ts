@@ -31,8 +31,8 @@ describe('CdApi', () => {
         {
           id: 'e1',
           name: 'qits',
-          branch: 'main',
           network: 'qits-net',
+          platform: true,
           createdAt: '2026-07-01T00:00:00Z',
           applications: null,
         },
@@ -47,7 +47,6 @@ describe('CdApi', () => {
       environment: {
         id: 'e1',
         name: 'qits',
-        branch: 'main',
         network: 'qits-net',
         createdAt: '2026-07-01T00:00:00Z',
         applications: [
@@ -69,7 +68,7 @@ describe('CdApi', () => {
     // client that assumed so would throw on the one response shape the service already emits.
     const applications = api.applications('e1');
     http.expectOne('/platform-deployments/api/environments/e1').flush({
-      environment: { id: 'e1', name: 'qits', branch: 'main', network: 'n', applications: null },
+      environment: { id: 'e1', name: 'qits', network: 'n', applications: null },
     });
     await expect(applications).resolves.toEqual([]);
   });
@@ -92,20 +91,6 @@ describe('CdApi', () => {
     await expect(applications).resolves.toMatchObject([{ id: 'platform:qits-platform-idp' }]);
   });
 
-  it('asks for the platform plane by name where an environment id goes', async () => {
-    // `platform` is the stand-in the application ids already carry, and the one value of this
-    // filter that is not an environment id. It cannot collide: an environment id is a UUID.
-    const deployments = api.deployments('platform');
-    http
-      .expectOne(
-        (candidate) =>
-          candidate.url === '/platform-deployments/api/deployments' &&
-          candidate.params.get('environmentId') === 'platform',
-      )
-      .flush({ deployments: [] });
-    await expect(deployments).resolves.toEqual([]);
-  });
-
   it('filters deployments by environment, which the service requires', async () => {
     const deployments = api.deployments('e1');
     const request = http.expectOne(
@@ -115,6 +100,34 @@ describe('CdApi', () => {
     );
     request.flush({ deployments: [] });
     await expect(deployments).resolves.toEqual([]);
+  });
+
+  it('unwraps the deployment requests, filtered by the same environment', async () => {
+    // The listing that has no `platform` value: a request records no plane, and a platform
+    // service's request names the tier it deploys into, so it comes back in that tier's answer.
+    const requests = api.deploymentRequests('e1');
+    http
+      .expectOne(
+        (candidate) =>
+          candidate.url === '/platform-deployments/api/deployment-requests' &&
+          candidate.params.get('environmentId') === 'e1',
+      )
+      .flush({
+        deploymentRequests: [
+          {
+            id: 'r1',
+            applicationName: 'qits-ci',
+            version: '2026.903.113443',
+            environmentId: 'e1',
+            qualityGate: 'MET',
+            gateDetail: null,
+            deploymentId: 'd1',
+            createdAt: '2026-09-03T11:34:43Z',
+            gateSettledAt: '2026-09-03T11:34:43Z',
+          },
+        ],
+      });
+    await expect(requests).resolves.toMatchObject([{ id: 'r1', version: '2026.903.113443' }]);
   });
 
   it('rejects with the HttpErrorResponse, so callers can read the status', async () => {

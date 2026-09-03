@@ -13,10 +13,11 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { QITS_SCOPE, QitsButton } from '@qits/ui-components';
 import { CdApi } from '../api/cd-api';
 import {
-  PLATFORM_PLANE,
   isInFlight,
+  isPendingGate,
   type CdApplicationDto,
   type CdDeploymentDto,
+  type CdDeploymentRequestDto,
   type CdEnvironmentDto,
   type ProjectDto,
 } from '../api/dto';
@@ -79,20 +80,23 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * explorer, whose run listing
  * takes a mandatory repository filter and therefore cannot see its own orphans without one.
  *
- * **The platform plane is a root of its own, beside the projects.** An application deployed once
- * for the whole platform — qits-platform-idp, qits-ci, this component — belongs to no environment,
- * so no project and no tier can lead to it: reading this page through the projects alone showed
- * three of the platform's eleven applications and gave no hint the other eight existed. It is drawn
- * as a third root rather than folded into every environment because it is not in any of them; `GET
- * /applications` is the flat listing that reaches it and `?environmentId=platform` is its
- * deployment history.
+ * **The platform services are listed under the environment they are deployed to, and there is no
+ * section for them.** There used to be: a platform service belonged to no environment at all, so no
+ * project and no tier could lead to it and a third root was the only way to draw it. It belongs to
+ * one now — the designated environment is where the plane is deployed, and its deployment rows name
+ * that tier like any other — so it is one more row in that tier's table, with a `platform` tag on
+ * the row saying the one thing that is still true of it: it is linked into no environment, which is
+ * why one release of it reaches every tier at once. The section outlived the model it came from,
+ * and a root that holds services that *are* in an environment is a lie about where they run.
+ *
+ * The catalogue still cannot list them through the environment — a platform service carries no link,
+ * deliberately — so `GET /applications` is where they come from, and the page merges that listing
+ * into the one environment whose `platform` flag says the plane deploys there.
  *
  * **Two requests on load, both flat lists**; everything below costs a click (Decision 3). Expanding
- * a project costs two more, because the environment listing answers `applications: null` by design
- * and the deployment listing is a separate resource — and the platform bucket costs the same two,
- * which is why it starts closed while the unmatched-environments bucket starts open. That bucket is
- * free (its contents arrived with the page); this one is not, and Decision 3 does not stop applying
- * to a root just because the root is interesting.
+ * a project costs three more — the environment's applications, its deployments and its deployment
+ * requests, none of which the listing carries — and a fourth for the designated environment, whose
+ * platform services come off the flat catalogue.
  *
  * Expansion lives in the query parameters
  * (`/platform-deployments/?project=…`, and `env=` for the bucket) rather than in path segments: it
@@ -131,19 +135,26 @@ export class DeploymentsPage {
   protected readonly environments = signal<Loadable<readonly CdEnvironmentDto[]>>(LOADING);
 
   /**
-   * Per plane, its applications. A missing key is a plane nobody has expanded.
-   *
-   * The key is an environment id or {@link PLATFORM_PLANE}, in one map rather than two: they cannot
-   * collide (an environment id is a random UUID), and everything that reads these caches — the
-   * table, the poll, the expansion effect — asks the same question of both.
+   * Per environment, its applications — the tier's own, plus the platform services where the plane
+   * deploys. A missing key is an environment nobody has expanded.
    */
   protected readonly applications = signal<
     ReadonlyMap<string, Loadable<readonly CdApplicationDto[]>>
   >(new Map());
 
-  /** Per plane, its deployments, newest first across all of its applications. */
+  /** Per environment, its deployments, newest first across all of its applications. */
   protected readonly deployments = signal<
     ReadonlyMap<string, Loadable<readonly CdDeploymentDto[]>>
+  >(new Map());
+
+  /**
+   * Per environment, the versions asked for in it, newest first.
+   *
+   * A third cache rather than a field on the deployments, for the reason it is a third endpoint: a
+   * request the gate refused produced no deployment, so it cannot be reached through one.
+   */
+  protected readonly requests = signal<
+    ReadonlyMap<string, Loadable<readonly CdDeploymentRequestDto[]>>
   >(new Map());
 
   /**
@@ -153,19 +164,6 @@ export class DeploymentsPage {
    * click.
    */
   protected readonly bucketOpen = signal(true);
-
-  /**
-   * The platform bucket, closed until asked for — unlike the one above it, opening this costs the
-   * two requests every other expansion costs.
-   *
-   * Local state rather than a query parameter, and that is the same rule the other bucket follows:
-   * the URL carries the two levels a *reader* would want to link to, and a root that is always on
-   * screen is not one of them.
-   */
-  protected readonly platformOpen = signal(false);
-
-  /** The plane's key, for the template — it addresses the caches like any environment id. */
-  protected readonly platformPlane = PLATFORM_PLANE;
 
   /** A poll that failed, said beside the table rather than instead of it. */
   protected readonly pollProblem = signal('');
@@ -219,9 +217,13 @@ export class DeploymentsPage {
   });
 
   /**
-   * The tier whose branch deploys the platform plane, or null while the environments are loading
-   * and when none is designated. Exactly one row carries the flag; `find` rather than a lookup
-   * because the server holds that invariant, not this client.
+   * The environment a release enters the platform at and the platform plane is deployed into, or
+   * null while the environments are loading and when none is designated. Exactly one row carries
+   * the flag; `find` rather than a lookup because the server holds that invariant, not this client.
+   *
+   * It is what decides where the platform services are listed. They carry no link into it — that is
+   * what being platform-tier means — so this flag is the only thing on the wire that says where
+   * they run, and an install with none designated is one where nothing can deploy at all.
    */
   protected readonly platformEnvironment = computed(
     () => this.environmentList().find((environment) => environment.platform) ?? null,
@@ -266,11 +268,8 @@ export class DeploymentsPage {
     );
   });
 
-  /**
-   * Every plane currently on screen: the matched environments opened, the bucket's own, and the
-   * platform plane when its bucket is open.
-   */
-  private readonly openPlaneIds = computed<readonly string[]>(() => {
+  /** Every environment currently on screen: the matched ones opened, and the bucket's own. */
+  private readonly openEnvironmentIds = computed<readonly string[]>(() => {
     const ids = new Set<string>();
     for (const project of this.projectList()) {
       if (this.expandedProjects().has(project.id)) {
@@ -285,37 +284,37 @@ export class DeploymentsPage {
         ids.add(environment.id);
       }
     }
-    if (this.platformOpen()) {
-      ids.add(PLATFORM_PLANE);
-    }
     return [...ids];
   });
 
   /**
-   * The planes worth polling: on screen, and holding a deployment that is still moving.
+   * The environments worth polling: on screen, and holding something that has not landed — a
+   * deployment still moving, or a request still in the gate.
    *
-   * "Visible" is the whole test. A collapsed plane's cached rows are not being read by anybody, and
-   * re-reading them would be traffic for a table nobody is looking at.
+   * "Visible" is the whole test. A collapsed environment's cached rows are not being read by
+   * anybody, and re-reading them would be traffic for a table nobody is looking at.
+   *
+   * The gate is in the test even though today's placeholder settles inside the transaction that
+   * writes the request, so nothing is ever seen pending. The lifecycle this page follows is request
+   * → gate → deployment, and a poll that watched only the third step would go quiet on the day the
+   * first gate takes a minute — which is the day it matters most.
    */
   private readonly followed = computed<readonly string[]>(() =>
-    this.openPlaneIds().filter((planeId) => {
-      const state = this.deployments().get(planeId);
-      return (
-        state?.kind === 'ready' && state.value.some((deployment) => isInFlight(deployment.status))
-      );
+    this.openEnvironmentIds().filter((environmentId) => {
+      const deployments = this.deployments().get(environmentId);
+      const requests = this.requests().get(environmentId);
+      const deploying =
+        deployments?.kind === 'ready' &&
+        deployments.value.some((deployment) => isInFlight(deployment.status));
+      const gating = requests?.kind === 'ready' && requests.value.some(isPendingGate);
+      return deploying || gating;
     }),
   );
 
-  /**
-   * `following 2 planes`, and only while there is something to follow.
-   *
-   * "Plane" rather than "environment" because the platform is one of the things that can be
-   * followed and is not an environment — a self-update of qits-deployments is exactly the
-   * deployment a reader watches this line for.
-   */
+  /** `following 2 environments`, and only while there is something to follow. */
   protected readonly following = computed(() => {
     const count = this.followed().length;
-    return count === 0 ? '' : `following ${count} ${count === 1 ? 'plane' : 'planes'}`;
+    return count === 0 ? '' : `following ${count} ${count === 1 ? 'environment' : 'environments'}`;
   });
 
   constructor() {
@@ -325,9 +324,9 @@ export class DeploymentsPage {
     // It re-runs when the environments arrive, which is what makes a deep link into a project work
     // before the join is even computable.
     effect(() => {
-      for (const planeId of this.openPlaneIds()) {
-        if (!this.applications().has(planeId)) {
-          void this.loadPlane(planeId);
+      for (const environmentId of this.openEnvironmentIds()) {
+        if (!this.applications().has(environmentId)) {
+          void this.loadEnvironment(environmentId);
         }
       }
     });
@@ -350,6 +349,7 @@ export class DeploymentsPage {
   protected async reload(): Promise<void> {
     this.applications.set(new Map());
     this.deployments.set(new Map());
+    this.requests.set(new Map());
     this.pollProblem.set('');
     await Promise.all([this.loadProjects(), this.loadEnvironments()]);
   }
@@ -373,47 +373,89 @@ export class DeploymentsPage {
   }
 
   /**
-   * One plane's two lists, in parallel. Both are written `loading` before either is awaited, so the
-   * key exists by the time the expansion effect could run again and the request is never issued
-   * twice.
+   * One environment's three lists, in parallel. All three are written `loading` before any is
+   * awaited, so the keys exist by the time the expansion effect could run again and no request is
+   * issued twice.
    *
-   * **The one branch between the two planes is which listing holds the applications**, and it is
-   * here rather than in two methods: the deployment listing takes the plane's key either way, both
-   * results go into the same caches under the same key, and every failure and retry below is the
-   * same code. An environment reads its own aggregate; the platform reads the flat catalogue,
-   * because there is no environment resource to read it through.
+   * **The applications are the tier's own plus, for the designated environment, the platform
+   * services.** That merge is here rather than in the table because it is a fact about the API and
+   * not about rendering: the catalogue deliberately records no link for a platform service, so the
+   * environment aggregate cannot list one, and the flat listing is the only place it exists. Below
+   * this line a platform service is one more application in this environment, which is what it is.
+   *
+   * A failed catalogue read fails the environment; a failed platform read does not, and that
+   * asymmetry is deliberate — the tier's own services are the table, and the platform ones are
+   * additions to it. Losing them costs rows, and losing the tier's costs the table.
    */
-  protected async loadPlane(planeId: string): Promise<void> {
-    this.applications.update((map) => withEntry(map, planeId, LOADING));
-    this.deployments.update((map) => withEntry(map, planeId, LOADING));
+  protected async loadEnvironment(environmentId: string): Promise<void> {
+    this.applications.update((map) => withEntry(map, environmentId, LOADING));
+    this.deployments.update((map) => withEntry(map, environmentId, LOADING));
+    this.requests.update((map) => withEntry(map, environmentId, LOADING));
     await Promise.all([
       (async () => {
         try {
-          const applications =
-            planeId === PLATFORM_PLANE
-              ? await this.cdApi.platformApplications()
-              : await this.cdApi.applications(planeId);
-          this.applications.update((map) => withEntry(map, planeId, ready(applications)));
+          // In parallel, not in sequence: they are two independent listings, and chaining them
+          // would put the flat catalogue's latency behind the aggregate's for no reason.
+          const [own, platform] = await Promise.all([
+            this.cdApi.applications(environmentId),
+            this.platformApplicationsOf(environmentId),
+          ]);
+          this.applications.update((map) =>
+            withEntry(map, environmentId, ready([...own, ...platform])),
+          );
         } catch (error) {
-          this.applications.update((map) => withEntry(map, planeId, failed(error)));
+          this.applications.update((map) => withEntry(map, environmentId, failed(error)));
         }
       })(),
       (async () => {
         try {
-          const deployments = await this.cdApi.deployments(planeId);
-          this.deployments.update((map) => withEntry(map, planeId, ready(deployments)));
+          const deployments = await this.cdApi.deployments(environmentId);
+          this.deployments.update((map) => withEntry(map, environmentId, ready(deployments)));
         } catch (error) {
-          this.deployments.update((map) => withEntry(map, planeId, failed(error)));
+          this.deployments.update((map) => withEntry(map, environmentId, failed(error)));
+        }
+      })(),
+      (async () => {
+        try {
+          const requests = await this.cdApi.deploymentRequests(environmentId);
+          this.requests.update((map) => withEntry(map, environmentId, ready(requests)));
+        } catch (error) {
+          this.requests.update((map) => withEntry(map, environmentId, failed(error)));
         }
       })(),
     ]);
   }
 
   /**
-   * One poll of every followed plane. It re-reads the deployments only — the applications a plane
-   * tracks do not change while a container starts — and it does **not** drop the table back to a
-   * skeleton: the rows on screen are still the last thing the server said, and blanking them every
-   * five seconds would make a starting deployment unreadable.
+   * The platform services, for the one environment the plane deploys into, and `[]` for every
+   * other — so the flat catalogue is read once per expansion of that environment and never at all
+   * for the rest.
+   *
+   * A read that fails answers `[]` rather than failing the environment: see `loadEnvironment`.
+   */
+  private async platformApplicationsOf(
+    environmentId: string,
+  ): Promise<readonly CdApplicationDto[]> {
+    if (this.platformEnvironment()?.id !== environmentId) {
+      return [];
+    }
+    try {
+      return await this.cdApi.platformApplications();
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * One poll of every followed environment: its deployments and its requests. The applications are
+   * not re-read — what an environment tracks does not change while a container starts — and the
+   * poll does **not** drop the table back to a skeleton: the rows on screen are still the last thing
+   * the server said, and blanking them every five seconds would make a starting deployment
+   * unreadable.
+   *
+   * The requests are polled beside the deployments because they are the first step of the same
+   * lifecycle: a release lands as a request before it is anything else, so a table that re-read only
+   * the deployments would show a new version arriving with no record of it having been asked for.
    */
   private async poll(): Promise<void> {
     if (this.polling) {
@@ -422,10 +464,14 @@ export class DeploymentsPage {
     this.polling = true;
     try {
       await Promise.all(
-        this.followed().map(async (planeId) => {
+        this.followed().map(async (environmentId) => {
           try {
-            const deployments = await this.cdApi.deployments(planeId);
-            this.deployments.update((map) => withEntry(map, planeId, ready(deployments)));
+            const [deployments, requests] = await Promise.all([
+              this.cdApi.deployments(environmentId),
+              this.cdApi.deploymentRequests(environmentId),
+            ]);
+            this.deployments.update((map) => withEntry(map, environmentId, ready(deployments)));
+            this.requests.update((map) => withEntry(map, environmentId, ready(requests)));
             this.pollProblem.set('');
           } catch (error) {
             this.pollProblem.set(describeError(error));
@@ -474,15 +520,16 @@ export class DeploymentsPage {
     return this.environmentsByName().get(project.slug) ?? null;
   }
 
-  protected nodeOf(planeId: string): EnvironmentNode {
-    const applications = this.applications().get(planeId);
-    const deployments = this.deployments().get(planeId);
-    return applications === undefined || deployments === undefined
+  protected nodeOf(environmentId: string): EnvironmentNode {
+    const applications = this.applications().get(environmentId);
+    const deployments = this.deployments().get(environmentId);
+    const requests = this.requests().get(environmentId);
+    return applications === undefined || deployments === undefined || requests === undefined
       ? UNVISITED
-      : { applications, deployments };
+      : { applications, deployments, requests };
   }
 
-  /** `environment "qits" · main · network qits-net` — what the match resolved to, spelled out. */
+  /** `environment "qits" · network qits-net` — what the match resolved to, spelled out. */
   protected projectMeta(project: ProjectDto): string {
     if (this.environments().kind !== 'ready') {
       return '';
@@ -493,8 +540,13 @@ export class DeploymentsPage {
       : 'no environment';
   }
 
+  /**
+   * The environment's own line. No branch — a release names a tag, and the column is gone from the
+   * API — and the platform designation is said out loud, because it is what explains why the
+   * platform services are in this tier's table and in no other's.
+   */
   protected environmentMeta(environment: CdEnvironmentDto): string {
-    const meta = `${environment.branch} · network ${environment.network}`;
+    const meta = `network ${environment.network}`;
     return environment.platform ? `${meta} · platform environment` : meta;
   }
 
@@ -515,38 +567,24 @@ export class DeploymentsPage {
   }
 
   /**
-   * The platform bucket's count, and only once it has been read. A closed bucket has asked nothing,
-   * so there is no number to draw — and inventing one would be the same lie as a table full of
-   * "never deployed".
+   * The sentence for an install where no environment is designated, or `''`.
    *
-   * The branch is drawn whether or not the bucket has been opened, because it is the one fact about
-   * this root that is not in the table: a platform service ships when the platform environment's
-   * branch is built and on no other, so "deployed from environment/prod" is what explains an empty
-   * or a stale table. Absent while the environments are still loading, and absent — pointedly — when
-   * no environment is designated at all, which is a state in which nothing here can deploy.
+   * The one fact the tables cannot show, because it is about their absence: a release enters the
+   * platform at the designated environment, so with none designated nothing deploys anywhere and
+   * every table on this page is empty for a reason no row can state. It replaced the platform
+   * bucket's meta line, which was where this used to be said.
+   *
+   * Silent while the environments are still loading — an unanswered question is not a missing
+   * designation.
    */
-  protected platformMeta(): string {
-    const parts: string[] = [];
-    const state = this.applications().get(PLATFORM_PLANE);
-    if (state?.kind === 'ready') {
-      const count = state.value.length;
-      parts.push(`${count} ${count === 1 ? 'service' : 'services'}`);
-    }
-    const platform = this.platformEnvironment();
-    if (platform) {
-      parts.push(`deployed from ${platform.branch}`);
-    } else if (this.environments().kind === 'ready') {
-      parts.push('no platform environment — nothing here can deploy');
-    }
-    return parts.join(' · ');
+  protected noPlatformEnvironment(): string {
+    return this.environments().kind === 'ready' && this.platformEnvironment() === null
+      ? 'No environment is the platform environment — a release enters nowhere and nothing here can deploy.'
+      : '';
   }
 
   protected toggleBucket(): void {
     this.bucketOpen.update((open) => !open);
-  }
-
-  protected togglePlatform(): void {
-    this.platformOpen.update((open) => !open);
   }
 
   protected toggleProject(projectId: string): void {
