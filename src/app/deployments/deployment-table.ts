@@ -50,6 +50,51 @@ export interface EnvironmentNode {
   readonly requests: Loadable<readonly CdDeploymentRequestDto[]>;
 }
 
+/**
+ * When a deployment was created, in milliseconds, or `null` for a row whose stamp is not a time.
+ *
+ * `createdAt` and never `finishedAt`: the question is which attempt is the LATEST, and an attempt
+ * that is still running has no finish at all. A row the server sent with an unparseable stamp
+ * answers `null` and is ordered by nothing rather than by `NaN`.
+ */
+function startedAt(deployment: CdDeploymentDto): number | null {
+  const parsed = Date.parse(deployment.createdAt);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * One application's deployments, newest first — **the table's definition of "current", said out
+ * loud instead of inherited from the order a list happened to arrive in.**
+ *
+ * It used to be inherited. `current` was the first row of the bucket and the bucket was filled in
+ * arrival order, so the row an operator reads as the application's state was correct exactly as
+ * long as every list feeding this table was sorted newest-first end to end. That held for one
+ * listing and stopped being a property anybody could check the moment the page began merging rows
+ * from more than one read — and it fails silently, in the one direction that matters: a stale
+ * `FAILED` or `IMAGE_MISSING` attempt shown as the current state of an application that is in fact
+ * `ACTIVE`, which is an outage reported where there is none.
+ *
+ * **The comparison is the timestamp, and ties keep the server's order.** `Array.prototype.sort` is
+ * stable, so two rows created in the same tick stay in the order the API sent them — which is `seq
+ * desc`, the monotonic tiebreak the server has and the wire shape does not carry. That is why the
+ * comparator answers `0` rather than reaching for the id: an arbitrary tiebreak would *replace* a
+ * real ordering with a coin flip.
+ *
+ * Status is deliberately not consulted. The newest row is the current state whatever it says — a
+ * deployment that is failing right now must read `Failed`, and a rule that preferred the newest
+ * `ACTIVE` row would hide exactly the outage this page exists to show.
+ */
+function newestFirst(bucket: CdDeploymentDto[]): CdDeploymentDto[] {
+  return bucket.sort((left, right) => {
+    const started = startedAt(left);
+    const other = startedAt(right);
+    if (started === null || other === null || started === other) {
+      return 0;
+    }
+    return other - started;
+  });
+}
+
 /** An environment nobody has expanded: no request made, and that is a state rather than an absence. */
 export const UNVISITED: EnvironmentNode = {
   applications: IDLE,
@@ -127,11 +172,14 @@ interface Row {
  * an operator is looking for — the one that should be running and is not. It gets a row reading
  * *never deployed* instead.
  *
- * **"Current" is the first row per `applicationId`** in a list the server already sorted newest
- * first. One client-side pass, no extra request, and `CdDeploymentDto` carries `applicationName` so
- * nothing has to be looked up. Everything behind that first row is history: a redeploy decommissions
- * its predecessor, so it is the same application's past rather than its state, and it stays behind
- * the row's own expansion rather than doubling the table's length by default.
+ * **"Current" is the NEWEST row per `applicationId`, by its own timestamp** — one client-side pass
+ * over the deployments, no extra request, and `CdDeploymentDto` carries `applicationName` so
+ * nothing has to be looked up. It used to be "the first row per `applicationId`", which is the same
+ * answer only while every list feeding this table arrives newest-first; `newestFirst` says why that
+ * stopped being something a reader could verify, and what a wrong answer here looks like on screen.
+ * Everything behind that newest row is history: a redeploy decommissions its predecessor, and a
+ * superseded failed attempt is the same application's past rather than its state, so it stays
+ * behind the row's own expansion rather than doubling the table's length by default.
  *
  * **The version is the coordinate and the sha is the commit behind it.** A deployment is created
  * from `qits/<app>:<version>` since a release became the trigger, so the CalVer stamp is what
@@ -672,10 +720,11 @@ export class DeploymentTable {
    * One row per application, newest deployment first, everything behind it kept as history, and
    * every version ever asked for folded in beside it.
    *
-   * History is defined by *position*, not by status. A `DECOMMISSIONED` filter would agree on the
-   * happy path and be wrong everywhere else: a superseded `FAILED` attempt is history too, and a
+   * History is defined by *age*, not by status. A `DECOMMISSIONED` filter would agree on the happy
+   * path and be wrong everywhere else: a superseded `FAILED` attempt is history too, and a
    * decommissioned row that is the newest one is the application's current state and belongs in
-   * the table rather than behind the affordance.
+   * the table rather than behind the affordance. Age is read off `createdAt` here rather than off
+   * the list's order — `newestFirst`.
    *
    * **Requests join by name and deployments by id**, which is not an inconsistency but the two
    * keys the server offers: a deployment row records its plane so the server derives
@@ -703,6 +752,12 @@ export class DeploymentTable {
       } else {
         byApplication.set(deployment.applicationId, [deployment]);
       }
+    }
+    // The row an operator reads as the application's state is the NEWEST one, and this is where
+    // that is decided — see `newestFirst`. Ordering here rather than per row so every consumer
+    // below (the current row, the history behind it, the leftover buckets) reads one ordering.
+    for (const bucket of byApplication.values()) {
+      newestFirst(bucket);
     }
 
     const byName = new Map<string, CdDeploymentRequestDto[]>();

@@ -12,8 +12,12 @@ import { QitsBadge, type QitsBadgeTone } from '@qits/ui-components';
  * none is a running container, and inventing a distinction the badge does not have would be
  * decoration. `IMAGE_MISSING` is `warning` rather than `danger` because nothing failed here — a
  * build published no image, which is a condition upstream of this deployment rather than a fault in
- * it. `ROLLED_BACK` is `warning` for the mirror image of that reason: the update failed, but the
- * orchestrator put the predecessor back and the service never stopped serving.
+ * it. `SPEC_UNREADABLE` is `warning` on the same argument and one step further: the git host would
+ * not serve the file that says where this release goes, nothing about the repository is being
+ * claimed, and the deployer is reading it again — a `danger` badge would page somebody for a
+ * condition that is usually over in thirty seconds. `ROLLED_BACK` is `warning` for the mirror image
+ * of that reason: the update failed, but the orchestrator put the predecessor back and the service
+ * never stopped serving.
  *
  * `SCALED_TO_ZERO` is `warning` and reads **Stopped**, which is the one place this map makes a
  * judgement rather than a translation. It is not `danger`: somebody stopped this application on
@@ -33,6 +37,7 @@ const TONES: Readonly<Record<string, QitsBadgeTone>> = {
   STARTING: 'info',
   ACTIVE: 'success',
   IMAGE_MISSING: 'warning',
+  SPEC_UNREADABLE: 'warning',
   ROLLED_BACK: 'warning',
   FAILED: 'danger',
   GONE: 'danger',
@@ -54,6 +59,7 @@ const LABELS: Readonly<Record<string, string>> = {
   STARTING: 'Starting',
   ACTIVE: 'Active',
   IMAGE_MISSING: 'Image missing',
+  SPEC_UNREADABLE: 'Spec unreadable',
   ROLLED_BACK: 'Rolled back',
   FAILED: 'Failed',
   GONE: 'Gone',

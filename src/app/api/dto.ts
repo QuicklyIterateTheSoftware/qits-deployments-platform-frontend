@@ -24,19 +24,26 @@
  */
 
 /**
- * A deployment's state. `QUEUED` and `STARTING` are the two non-terminal ones, and that is the
- * whole rule behind Decision 5's poll — everything else sits still for days.
+ * A deployment's state. `QUEUED`, `STARTING` and `SPEC_UNREADABLE` are the non-terminal ones, and
+ * that is the whole rule behind Decision 5's poll — everything else sits still for days.
  *
  * The last three are outcomes the server settles a row into *after* the deployment itself is over,
  * which is why none of them is in flight: `ROLLED_BACK` is an update that failed onto a predecessor
  * that kept serving, `SUPERSEDED` an interrupted attempt a newer deployment overtook, and `GONE` a
  * row that was serving until its container vanished under it.
+ *
+ * `SPEC_UNREADABLE` is the odd one and the reason `isInFlight` is no longer two words: the git host
+ * would not serve the repository's `deployments.yml` at the released tag, so the deployer never
+ * learned where this release goes and is reading the file again on its own cadence. Nothing about
+ * the repository is being claimed and nothing is running yet — it is a release the server is still
+ * working on, which is exactly what this page polls for.
  */
 export type CdDeploymentStatus =
   | 'QUEUED'
   | 'STARTING'
   | 'ACTIVE'
   | 'IMAGE_MISSING'
+  | 'SPEC_UNREADABLE'
   | 'ROLLED_BACK'
   | 'FAILED'
   | 'GONE'
@@ -56,8 +63,15 @@ export function isStopped(status: CdDeploymentStatus): boolean {
   return status === 'SCALED_TO_ZERO';
 }
 
-/** The statuses a poll is waiting on. Anything else is settled. */
-const IN_FLIGHT: readonly CdDeploymentStatus[] = ['QUEUED', 'STARTING'];
+/**
+ * The statuses a poll is waiting on. Anything else is settled.
+ *
+ * `SPEC_UNREADABLE` is in here even though no container is starting, because the server has not
+ * finished with the row: it re-reads the repository's spec on its observation cadence and deploys
+ * the release for real when the file answers. A table that stopped polling on it would show a
+ * release as stuck at the moment it was about to move.
+ */
+const IN_FLIGHT: readonly CdDeploymentStatus[] = ['QUEUED', 'STARTING', 'SPEC_UNREADABLE'];
 
 /** Whether this deployment is still moving — the only reason this page ever polls. */
 export function isInFlight(status: CdDeploymentStatus): boolean {

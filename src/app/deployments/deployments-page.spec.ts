@@ -527,6 +527,103 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('31 Jul 2026 15:21:00Z');
   });
 
+  it('reads the newest row as the current state whatever order the list arrives in', async () => {
+    // The row-choice regression, and the direction it fails in is the whole reason this is pinned:
+    // an operator was shown a stale FAILED attempt as the state of an application whose newest
+    // deployment is ACTIVE — an outage reported where there is none. The bucket below arrives with
+    // the OLDER row first, which is what an ordering this table inherits rather than performs
+    // cannot survive.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [
+        deployment('older', 'a1', {
+          status: 'FAILED',
+          commitSha: '1de0447aa',
+          createdAt: '2026-07-31T13:31:00Z',
+          detail: 'the registry refused the pull',
+        }),
+        deployment('newest', 'a1', {
+          status: 'ACTIVE',
+          commitSha: 'aa71903ff',
+          createdAt: '2026-07-31T13:38:00Z',
+        }),
+      ],
+    );
+
+    expect(text()).toContain('Active');
+    expect(text()).toContain('aa71903');
+    // The failed attempt is history, so it is behind the expansion rather than on the row.
+    expect(text()).not.toContain('Failed');
+    expect(text()).not.toContain('1de0447');
+
+    await click('qits-ci');
+
+    expect(text()).toContain('1 earlier deployment');
+    expect(text()).toContain('Failed');
+    expect(text()).toContain('1de0447');
+  });
+
+  it('shows a newest row that is failing as failed, because that is the current state', async () => {
+    // The mirror, and it is why the fix above is an ORDERING and never "prefer the ACTIVE row": an
+    // application whose latest attempt failed over a predecessor that once served is down, and a
+    // table that reached back for the healthy row would hide exactly the outage it exists to show.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [
+        deployment('served', 'a1', {
+          status: 'ACTIVE',
+          commitSha: '1de0447aa',
+          createdAt: '2026-07-31T13:31:00Z',
+        }),
+        deployment('failing', 'a1', {
+          status: 'FAILED',
+          commitSha: 'aa71903ff',
+          createdAt: '2026-07-31T13:38:00Z',
+        }),
+      ],
+    );
+
+    expect(text()).toContain('Failed');
+    expect(text()).toContain('aa71903');
+    expect(text()).not.toContain('1de0447');
+  });
+
+  it('draws a held spec read as its own word rather than as a failure', async () => {
+    // SPEC_UNREADABLE: the git host would not serve the file that says where this release goes, so
+    // nothing about the repository is being claimed and the deployer is reading it again. It is a
+    // warning and not a danger, and it must never render as the raw enum word.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-deployments')],
+      [
+        deployment('d1', 'a1', {
+          status: 'SPEC_UNREADABLE',
+          containerName: null,
+          detail: '[deployment spec unreadable: the git host answered 403]',
+        }),
+      ],
+    );
+
+    expect(text()).toContain('Spec unreadable');
+    expect(text()).not.toContain('SPEC_UNREADABLE');
+    // Nothing is running under it, so there is no lever to offer.
+    expect(text()).toContain('nothing running');
+  });
+
   it('shows what a release asked for beside what it became, on the row it happened to', async () => {
     // The lifecycle a `SoftwareRelease` produces, on one line: request → gate → deployment. The
     // request is folded into the application's row by name, because the deployment on that row is
