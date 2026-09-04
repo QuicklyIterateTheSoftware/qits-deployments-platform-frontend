@@ -122,7 +122,12 @@ export function formatDuration(from: string | null, to: string | null, nowMs?: n
 /**
  * The first seven characters of a sha, as git itself abbreviates. The cell carries the full sha in
  * its `title`, because seven characters is a label and the whole thing is the fact.
+ *
+ * Null is a real answer since a deployment became a version rather than a commit: a repository
+ * carrying no deployments.yml answers the spec read with a 404, which says nothing about where the
+ * released tag points, and the row records the version with no sha behind it. That renders as
+ * nothing at all rather than as `undefine`.
  */
-export function shortSha(sha: string): string {
-  return sha.slice(0, 7);
+export function shortSha(sha: string | null): string {
+  return sha ? sha.slice(0, 7) : NONE;
 }

@@ -6,8 +6,9 @@ the root of `deployments.<env>.<domain>` through Quinoa. One screen, no forms, n
 - **`/`** (and `/<projectSlug>/`) — deployments by project. Projects (from qits-projects) → the cd
   environment each project's slug names → a table of that environment's applications and what is
   currently deployed on each. The page itself makes two requests, both flat lists; expanding a
-  project costs two more and caches. Expansion is carried in the query parameters (`?project=…`),
-  so it is bookmarkable and the back button collapses.
+  project costs three more (the environment's applications, its deployments, its deployment
+  requests) and caches. Expansion is carried in the query parameters (`?project=…`), so it is
+  bookmarkable and the back button collapses.
 
 ## The project in the address
 
@@ -37,15 +38,51 @@ another application on a host of its own and this SPA's router owns nothing outs
 address comes from `QitsAppLinks`, which reads the platform's own navigation, and falls back to the
 old `/ci/` segment on the environment origin for as long as qits-ci has no host of its own.
 
+## The lifecycle a row shows
+
+A deploy is driven by a `SoftwareRelease` now, and the row follows what that produces: **request →
+gate → deployment**. The **Version** column is the CalVer coordinate the release minted — the git
+tag, and the tag the image carries — because that is what identifies a deployment; the commit
+beside it is what the tag resolved to and may be absent, which is a real answer and not a gap.
+
+`GET /platform-deployments/api/deployment-requests?environmentId=…` is the third read an expansion
+makes, and it exists because a request the quality gate refused **queues no deployment at all** —
+there is no row in the deployments listing that could show it. Where the newest request is not the
+deployment on the row, the version cell says so (`→ 2026.903.12 · gate unmet`), and the row's
+expansion lists every version asked for here with the gate's verdict and its reason. The gate is a
+placeholder that says yes to every released version today; the screen is written against both
+answers so that the first real refusal is visible the day it happens rather than a change later.
+
+A failed request read does not take the table down with it — it is drawn without them, behind a
+line naming what is missing. The table is still exactly what the service said ran.
+
+## Platform services
+
+There is no "Platform services" section, and its absence is deliberate. There was one, and it was
+right while a platform service belonged to no environment at all: no project and no tier could lead
+to it. A platform service is deployed **into the designated environment** now and its deployment
+rows name that tier, so it is one more row in that environment's table, carrying a quiet `platform`
+tag that says the one thing still true of it — it is linked into no environment, which is why one
+release of it reaches every tier at once.
+
+The catalogue still cannot list them through the environment (a platform service holds no link, on
+purpose, so a tier created tomorrow picks it up), so they come off the flat
+`GET /platform-deployments/api/applications` and are merged into the one environment whose
+`platform` flag says the plane deploys there. That fourth request is made for that environment only.
+An install with no environment designated deploys nothing anywhere, and the page says so in a
+banner — the one fact about this screen that no row can state.
+
 The base path is `/`: qits-deployments serves this app at the root of its own host, so `baseHref`
 here spells no segment at all. The `/platform-deployments` segment survives only as that service's
 wire prefix, in three of its keys (`quarkus.quinoa.ignored-path-prefixes`, `quarkus.rest.path`,
 `quarkus.http.non-application-root-path`) and its `routes:` line — all of them in that repository.
 The Angular project, the package and the type names still say `cd`; only paths moved.
 
-The page polls only while a visible deployment is `QUEUED` or `STARTING`, every five seconds, and
-stops on the first settled answer; a hidden tab polls nothing. A settled table is refreshed by the
-button and by nothing else.
+The page polls only while a visible deployment is `QUEUED` or `STARTING` — or a visible request is
+still in its gate — every five seconds, and stops on the first settled answer; a hidden tab polls
+nothing. It re-reads the deployments and the requests and never the catalogue: what an environment
+tracks does not change while a container starts. A settled table is refreshed by the button and by
+nothing else.
 
 `src/app/api/` holds hand-written interfaces mirroring the two services' wire shapes, one injectable
 service each, over `HttpClient` on the fetch backend. Nothing is generated, and nothing is shared
