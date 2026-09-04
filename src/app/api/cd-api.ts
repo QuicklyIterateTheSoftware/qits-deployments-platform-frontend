@@ -13,8 +13,18 @@ import type {
 } from './dto';
 
 /**
- * Everything this app reads from qits-deployments. There is nothing it writes: no redeploy, no
- * teardown, no environment management. The screen reports.
+ * Everything this app reads from qits-deployments, and the two things it writes.
+ *
+ * **The two writes are operations on a running application, not on the catalogue**: stop it, start
+ * it again, bounce it. There is still no redeploy, no teardown and no environment management here —
+ * what a repository deploys is derived from its own `deployments.yml` on every green build, and this
+ * screen has no business creating any of it. What it gained is the lever an operator reached for on
+ * the day qits-ci wedged: the alternative was re-firing a same-sha push and waiting a quarter of an
+ * hour for a rebuild that would replace the container.
+ *
+ * Both answer **202**: qits-deployments runs every orchestrator call on one worker, behind whatever
+ * is deploying, so the answer is "queued" and the deployment list is where the result appears. The
+ * page therefore re-reads the plane after each call rather than believing the response.
  *
  * `HttpClient` on the fetch backend rather than bare `fetch()`, for two reasons that both cash out
  * elsewhere: `HttpTestingController` is the only request-mocking story Angular ships and the specs
@@ -99,5 +109,41 @@ export class CdApi {
       }),
     );
     return response.deployments;
+  }
+
+  /**
+   * Set how many tasks of this application run: `0` stops it, `1` starts it again.
+   *
+   * The id is the same derived key the two listings are joined on (`<environmentId>:<name>`, or
+   * `platform:<name>`), which is why this takes no separate plane argument — the key already says
+   * which one.
+   *
+   * Scaling to zero keeps the service and everything about it, so starting it again is the same
+   * deployment coming back rather than a new one. That is the entire reason this is a scale and not
+   * a redeploy.
+   */
+  async scale(applicationId: string, replicas: number): Promise<void> {
+    await firstValueFrom(
+      this.http.post(
+        `${this.base}/platform-deployments/api/applications/${encodeURIComponent(applicationId)}/scale`,
+        { replicas },
+      ),
+    );
+  }
+
+  /**
+   * Replace the tasks running under this application's name, unchanged — the bounce.
+   *
+   * No deployment row is created and none is re-stated: the sha, the image and the history stay as
+   * the deployment left them, and the row gains a line saying who bounced it. It is the recovery for
+   * an application that is up, healthy to its probe, and wedged behind it.
+   */
+  async restart(applicationId: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(
+        `${this.base}/platform-deployments/api/applications/${encodeURIComponent(applicationId)}/restart`,
+        {},
+      ),
+    );
   }
 }

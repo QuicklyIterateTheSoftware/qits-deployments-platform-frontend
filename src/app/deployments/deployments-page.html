@@ -40,6 +40,10 @@
     </p>
   }
 
+  @if (operationProblem()) {
+    <p class="banner" role="alert">⚠ {{ operationProblem() }}.</p>
+  }
+
   @if (pollProblem()) {
     <p class="banner" role="status">
       ⚠ The last refresh failed — {{ pollProblem() }}. Showing what was read before it.
@@ -65,7 +69,9 @@
               @if (environment) {
                 <app-deployment-table
                   [node]="nodeOf(environment.id)"
+                  [busy]="operating()"
                   (reload)="loadPlane(environment.id)"
+                  (operate)="operate(environment.id, $event)"
                 />
               } @else {
                 <app-empty [message]="noEnvironmentMessage(project)" />
@@ -104,7 +110,9 @@
           <app-deployment-table
             [node]="nodeOf(platformPlane)"
             emptyMessage="No platform service is registered."
+            [busy]="operating()"
             (reload)="loadPlane(platformPlane)"
+            (operate)="operate(platformPlane, $event)"
           />
         }
       </app-tree-node>
@@ -138,7 +146,9 @@
                 @if (expandedEnvironments().has(environment.id)) {
                   <app-deployment-table
                     [node]="nodeOf(environment.id)"
+                    [busy]="operating()"
                     (reload)="loadPlane(environment.id)"
+                    (operate)="operate(environment.id, $event)"
                   />
                 }
               </app-tree-node>

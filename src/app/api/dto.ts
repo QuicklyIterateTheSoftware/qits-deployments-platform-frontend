@@ -40,8 +40,21 @@ export type CdDeploymentStatus =
   | 'ROLLED_BACK'
   | 'FAILED'
   | 'GONE'
+  | 'SCALED_TO_ZERO'
   | 'DECOMMISSIONED'
   | 'SUPERSEDED';
+
+/**
+ * The statuses an application is stopped in, and there is exactly one.
+ *
+ * It is the row's word for "somebody scaled this to zero": the deployment is intact — same sha,
+ * same service, same history — and the workload is deliberately not running. The table reads it to
+ * decide which of the two levers a row offers, because offering *Stop* on something already stopped
+ * would be an action with no effect and *Start* on something serving would be worse.
+ */
+export function isStopped(status: CdDeploymentStatus): boolean {
+  return status === 'SCALED_TO_ZERO';
+}
 
 /** The statuses a poll is waiting on. Anything else is settled. */
 const IN_FLIGHT: readonly CdDeploymentStatus[] = ['QUEUED', 'STARTING'];

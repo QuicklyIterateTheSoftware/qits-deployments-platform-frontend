@@ -1,13 +1,39 @@
 # qits-deployments-platform-frontend
 
-The CD explorer: the read-only view of what is deployed where, served by qits-deployments itself at
-the root of `deployments.<env>.<domain>` through Quinoa. One screen, no forms, no writes.
+The CD explorer: what is deployed where, served by qits-deployments itself at the root of
+`deployments.<env>.<domain>` through Quinoa. One screen, no forms — and exactly two writes, which
+are operations on a running application rather than changes to the catalogue.
 
 - **`/`** (and `/<projectSlug>/`) — deployments by project. Projects (from qits-projects) → the cd
   environment each project's slug names → a table of that environment's applications and what is
   currently deployed on each. The page itself makes two requests, both flat lists; expanding a
   project costs two more and caches. Expansion is carried in the query parameters (`?project=…`),
   so it is bookmarkable and the back button collapses.
+
+## The two levers
+
+Each row carries **Restart**, and **Stop**/**Start**. They exist because of a real incident: qits-ci
+wedged behind a healthy probe, and the only way to replace its container was re-firing a same-sha
+push to `environment/dev` and waiting a quarter of an hour for a rebuild.
+
+- **Restart** bounces the tasks in place — same image, same deployment, no new row. The service
+  stamps the deployment's `detail` with who did it and changes nothing else.
+- **Stop** scales the application to zero tasks and is asked twice: it takes an application off the
+  platform, so the confirmation is inline and names the row. The row then reads **Stopped**
+  (`SCALED_TO_ZERO`), a warning rather than a danger tone — somebody did it on purpose — and offers
+  **Start** in place of the other two.
+- **Start** scales it back to one. The row keeps saying *Stopped* until qits-deployments' own
+  observation finds the tasks healthy, which is up to one observation interval later. That wait is
+  deliberate here: the service reaches a health verdict in exactly one place, and this page must not
+  invent a completion it never promised.
+
+All three answer **202** — every orchestrator call runs on one worker behind whatever is deploying —
+so the page re-reads the plane after each and believes nothing about the response. A row whose
+deployment never reached the orchestrator (`IMAGE_MISSING`, and anything else with no container
+name) draws no lever at all: there is no service to act on and the API answers 409.
+
+The levers take `qits-platform:admin`, the same role every read here does: this is a person's
+operational action through the platform edge's forwarded header, and a machine token opens neither.
 
 ## The project in the address
 

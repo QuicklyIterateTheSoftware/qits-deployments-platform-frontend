@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { QitsAppLinks } from '@qits/ui-components';
-import type { CdApplicationDto, CdDeploymentDto } from '../api/dto';
+import { isStopped, type CdApplicationDto, type CdDeploymentDto } from '../api/dto';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import {
@@ -39,6 +39,40 @@ export interface EnvironmentNode {
 /** A plane nobody has expanded: no request made, and that is a state rather than an absence. */
 export const UNVISITED: EnvironmentNode = { applications: IDLE, deployments: IDLE };
 
+/**
+ * What an operator asked for on one row.
+ *
+ * Three words rather than a replica count, because that is what the buttons mean: `stop` and
+ * `start` are the two ends of the scale the service accepts, and `restart` is a different verb
+ * altogether — it changes nothing about how many run.
+ */
+export type OperationKind = 'restart' | 'stop' | 'start';
+
+export interface ApplicationOperation {
+  readonly applicationId: string;
+  readonly applicationName: string;
+  readonly kind: OperationKind;
+}
+
+/** One row, from the application it belongs to and the deployments that name it. */
+function row(
+  key: string,
+  name: string,
+  repoId: string | null,
+  history: readonly CdDeploymentDto[],
+): Row {
+  const current = history[0] ?? null;
+  return {
+    key,
+    name,
+    repoId,
+    current,
+    history: history.slice(1),
+    actionable: !!current?.containerName,
+    stopped: !!current && isStopped(current.status),
+  };
+}
+
 /** One application's line in the table, and the history hanging behind it. */
 interface Row {
   /** The application id, or the deployment's own when the environment no longer tracks it. */
@@ -50,6 +84,18 @@ interface Row {
   readonly current: CdDeploymentDto | null;
   /** Everything older, newest first. Mostly `DECOMMISSIONED`, and not drawn until asked for. */
   readonly history: readonly CdDeploymentDto[];
+  /**
+   * Whether there is a running service to act on at all.
+   *
+   * It is `containerName` on the current row and nothing cleverer: under swarm that string IS the
+   * service's name, and it is exactly what qits-deployments resolves an operation against. A
+   * deployment that never got that far — `IMAGE_MISSING` is the everyday shape — has no service
+   * anywhere, and the server answers 409. Drawing a button for it would be offering an action that
+   * cannot work.
+   */
+  readonly actionable: boolean;
+  /** Whether the workload is deliberately stopped, which decides Start against Restart/Stop. */
+  readonly stopped: boolean;
 }
 
 /**
@@ -97,6 +143,7 @@ interface Row {
               <th scope="col">Commit</th>
               <th scope="col">Last deployment</th>
               <th scope="col">Container</th>
+              <th scope="col">Operations</th>
             </tr>
           </thead>
           <tbody>
@@ -176,10 +223,59 @@ interface Row {
                     {{ none }}
                   }
                 </td>
+                <!--
+                  The operator's two levers, and they are drawn only where they can work. A row
+                  whose deployment never reached the orchestrator has no service to act on, so it
+                  gets a sentence rather than buttons that answer 409.
+                -->
+                <td class="ops">
+                  @if (!row.actionable) {
+                    <span class="never">nothing running</span>
+                  } @else if (busy().has(row.key)) {
+                    <span class="working" role="status">queued…</span>
+                  } @else if (confirming() === row.key) {
+                    <!--
+                      Stopping is the one action here that takes an application off the platform, so
+                      it is asked twice. Inline rather than a dialog: this table is a list of rows an
+                      operator scans, and the confirmation has to name the row it is about.
+                    -->
+                    <span class="confirm">Stop {{ row.name }}?</span>
+                    <button type="button" class="op danger" (click)="operateNow(row, 'stop')">
+                      Yes, stop it
+                    </button>
+                    <button type="button" class="op" (click)="cancelStop()">Cancel</button>
+                  } @else if (row.stopped) {
+                    <button
+                      type="button"
+                      class="op"
+                      title="Scale this application back to one task"
+                      (click)="operateNow(row, 'start')"
+                    >
+                      Start
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="op"
+                      title="Replace the tasks in place — same image, same deployment"
+                      (click)="operateNow(row, 'restart')"
+                    >
+                      Restart
+                    </button>
+                    <button
+                      type="button"
+                      class="op"
+                      title="Scale this application to zero tasks"
+                      (click)="askToStop(row)"
+                    >
+                      Stop
+                    </button>
+                  }
+                </td>
               </tr>
               @if (isOpen(row.key)) {
                 <tr class="expanded">
-                  <td colspan="6">
+                  <td colspan="7">
                     @if (row.current; as deployment) {
                       <p class="times">
                         Started {{ formatInstant(deployment.createdAt) }} · Finished
@@ -327,6 +423,39 @@ interface Row {
       gap: 0.5rem;
       padding: 0.1rem 0;
     }
+    .ops {
+      white-space: nowrap;
+    }
+    .op {
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 0.1rem 0.45rem;
+      margin-right: 0.3rem;
+      color: #374151;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+      cursor: pointer;
+    }
+    .op:hover {
+      background: #f3f4f6;
+    }
+    .op:focus-visible {
+      outline: 2px solid #4f46e5;
+      outline-offset: 1px;
+    }
+    .op.danger {
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
+    .confirm {
+      margin-right: 0.4rem;
+      color: #b91c1c;
+    }
+    .working {
+      color: #6b7280;
+      font-style: italic;
+    }
   `,
 })
 export class DeploymentTable {
@@ -342,6 +471,24 @@ export class DeploymentTable {
 
   /** Retry both requests — the inline retry on a failed environment. */
   readonly reload = output<void>();
+
+  /**
+   * Which rows have an operation in flight, by application id.
+   *
+   * The page owns it because the page owns the request: the table would otherwise have to know
+   * when a call finished, which is the one thing it deliberately does not do. A busy row draws
+   * `queued…` rather than its buttons, because qits-deployments answers 202 and the result arrives
+   * on the next read — offering the same button again in that window would let an operator queue
+   * three restarts for one wedge.
+   */
+  readonly busy = input<ReadonlySet<string>>(new Set<string>());
+
+  /**
+   * What an operator pressed. The table never calls the service itself: the page holds the caches
+   * every operation invalidates, and a component that both acted and displayed would have to hold
+   * a second copy of them.
+   */
+  readonly operate = output<ApplicationOperation>();
 
   protected readonly shortSha = shortSha;
   protected readonly formatDayTime = formatDayTime;
@@ -372,6 +519,14 @@ export class DeploymentTable {
   protected readonly now = tickingNow();
 
   private readonly open = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * The row whose Stop is waiting to be confirmed, or null.
+   *
+   * One at a time and local to the table: it is a question being asked, not state anybody would
+   * link to, and it dies with the node exactly as the row expansion does.
+   */
+  protected readonly confirming = signal<string | null>(null);
 
   /** One state for the pair, because the table needs both lists or neither. */
   protected readonly state = computed(() =>
@@ -406,13 +561,7 @@ export class DeploymentTable {
     const rows: Row[] = applications.map((application) => {
       const history = byApplication.get(application.id) ?? [];
       byApplication.delete(application.id);
-      return {
-        key: application.id,
-        name: application.name,
-        repoId: application.repoId,
-        current: history[0] ?? null,
-        history: history.slice(1),
-      };
+      return row(application.id, application.name, application.repoId, history);
     });
 
     // Deployments whose application the environment no longer lists. The API gives no way for this
@@ -420,13 +569,7 @@ export class DeploymentTable {
     // is not drawn is the one failure this table must not have, so it is drawn and labelled rather
     // than filtered away on the assumption.
     for (const [applicationId, history] of byApplication) {
-      rows.push({
-        key: applicationId,
-        name: history[0].applicationName,
-        repoId: null,
-        current: history[0],
-        history: history.slice(1),
-      });
+      rows.push(row(applicationId, history[0].applicationName, null, history));
     }
     return rows;
   });
@@ -438,6 +581,20 @@ export class DeploymentTable {
 
   protected isOpen(key: string): boolean {
     return this.open().has(key);
+  }
+
+  /** Ask before stopping. Nothing is emitted here — this only opens the question. */
+  protected askToStop(row: Row): void {
+    this.confirming.set(row.key);
+  }
+
+  protected cancelStop(): void {
+    this.confirming.set(null);
+  }
+
+  protected operateNow(row: Row, kind: OperationKind): void {
+    this.confirming.set(null);
+    this.operate.emit({ applicationId: row.key, applicationName: row.name, kind });
   }
 
   protected toggle(key: string): void {

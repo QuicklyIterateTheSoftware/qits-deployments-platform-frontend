@@ -25,7 +25,12 @@ import { injectScopedProject } from '../nav/scoped-project';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { LOADING, describeError, failed, ready, type Loadable } from '../ui/loadable';
-import { DeploymentTable, UNVISITED, type EnvironmentNode } from './deployment-table';
+import {
+  DeploymentTable,
+  UNVISITED,
+  type ApplicationOperation,
+  type EnvironmentNode,
+} from './deployment-table';
 import { TreeNode } from './tree-node';
 
 /**
@@ -169,6 +174,19 @@ export class DeploymentsPage {
 
   /** A poll that failed, said beside the table rather than instead of it. */
   protected readonly pollProblem = signal('');
+
+  /**
+   * The applications with an operation in flight, by id — one set across every plane, because an
+   * application id already names its plane (`<environmentId>:<name>`, `platform:<name>`).
+   *
+   * It exists because the service answers 202: nothing has happened yet when the call returns, and
+   * a row that kept offering its buttons in that window would let an operator queue three restarts
+   * for one wedged process.
+   */
+  protected readonly operating = signal<ReadonlySet<string>>(new Set<string>());
+
+  /** An operation that was refused, said beside the table — the poll banner's shape. */
+  protected readonly operationProblem = signal('');
 
   private pollHandle: ReturnType<typeof setInterval> | null = null;
   private polling = false;
@@ -351,6 +369,7 @@ export class DeploymentsPage {
     this.applications.set(new Map());
     this.deployments.set(new Map());
     this.pollProblem.set('');
+    this.operationProblem.set('');
     await Promise.all([this.loadProjects(), this.loadEnvironments()]);
   }
 
@@ -467,6 +486,49 @@ export class DeploymentsPage {
       void this.poll();
     }
     this.syncPolling();
+  }
+
+  /**
+   * Perform one operator action and read the plane back.
+   *
+   * **The re-read is the whole answer**, and it is why nothing here believes the response.
+   * qits-deployments runs every orchestrator call on one worker behind whatever is deploying, so a
+   * 202 says "queued" and the row is where the outcome appears — a stop lands as `Stopped` within a
+   * moment, and a start is settled by that service's own observation when the tasks are healthy,
+   * which is up to its observation interval later. So this reads once, immediately, and the reader
+   * refreshes if they are impatient. A spinner that waited for the row to change would be this page
+   * inventing a completion the service never promised.
+   */
+  protected async operate(planeId: string, operation: ApplicationOperation): Promise<void> {
+    const id = operation.applicationId;
+    this.operating.update((busy) => new Set([...busy, id]));
+    this.operationProblem.set('');
+    try {
+      if (operation.kind === 'restart') {
+        await this.cdApi.restart(id);
+      } else {
+        await this.cdApi.scale(id, operation.kind === 'stop' ? 0 : 1);
+      }
+      await this.loadPlane(planeId);
+    } catch (error) {
+      // Named, because a refusal here is actionable: 404 is an application nothing ever deployed,
+      // 409 one whose deployment never reached the orchestrator, 403 a session without the grant.
+      this.operationProblem.set(
+        `${this.verb(operation)} ${operation.applicationName} — ${describeError(error)}`,
+      );
+    } finally {
+      this.operating.update((busy) => {
+        const next = new Set(busy);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  /** What the failed action was, in the words the button used. */
+  private verb(operation: ApplicationOperation): string {
+    if (operation.kind === 'restart') return 'Could not restart';
+    return operation.kind === 'stop' ? 'Could not stop' : 'Could not start';
   }
 
   /** The environment a project's slug names, or null — and null is a rendered sentence. */
