@@ -67,19 +67,13 @@ export function isInFlight(status: CdDeploymentStatus): boolean {
 /**
  * Which plane an application is deployed on: one tier's, or the platform's own.
  *
- * A `PLATFORM` application belongs to no environment — it is deployed once for the whole platform —
- * which is why the environment aggregate cannot list it and the flat listing exists.
+ * **It no longer says where the thing runs.** A platform service is deployed *into* the main
+ * environment like everything else — the flag survives because it still decides three things the
+ * server cares about (a bare wire alias, membership in every tier's network, and the `platform:`
+ * key its rows are joined on) and one this screen cares about: it is worth saying, on the row, that
+ * this service is not the tier's own.
  */
 export type CdDeploymentTarget = 'ENVIRONMENT' | 'PLATFORM';
-
-/**
- * The word that goes where an environment id goes and names the platform plane instead.
- *
- * It is the same stand-in the server puts at the front of a platform application's id
- * (`platform:qits-platform-idp`), and the deployment listing takes it as the value of the
- * `environmentId` filter. Unambiguous by construction: a real environment id is a random UUID.
- */
-export const PLATFORM_PLANE = 'platform';
 
 /**
  * One tracked application, flattened into one tier.
@@ -88,9 +82,13 @@ export const PLATFORM_PLANE = 'platform';
  * the git-host directory name, the same string `CiRun.repoId` carries, but this page's only join is
  * environment-to-project by name, so `repoId` is a column and nothing more.
  *
- * `environmentId`, `environmentName` and `branch` are the plane's mirror image: the first two are
- * null exactly when `target` is `PLATFORM`, and `branch` is set only then — an environment
- * application takes its branch from the environment it is linked into.
+ * `environmentId` and `environmentName` are null exactly when `target` is `PLATFORM`, and they mean
+ * **"carries no link"** rather than "runs nowhere": a platform service is deployed into the
+ * designated environment and its deployment rows say so. The absence here is the catalogue's, which
+ * is what makes a tier created tomorrow pick the service up.
+ *
+ * There is no `branch`. A release names a tag, so nothing in this catalogue has a deploy ref of its
+ * own any more; the server dropped the field.
  */
 export interface CdApplicationDto {
   readonly id: string;
@@ -100,27 +98,28 @@ export interface CdApplicationDto {
   readonly environmentName: string | null;
   readonly target: CdDeploymentTarget;
   readonly availableOnEnv: boolean;
-  readonly branch: string | null;
   readonly healthPath: string | null;
   readonly createdAt: string;
 }
 
 /**
  * An environment. `applications` is **null in the list endpoint** and populated only by the single
- * read — which is why expanding a project costs two requests rather than one.
+ * read — which is why expanding a project costs more than one request.
+ *
+ * There is no `branch`: a tier listened to `environment/<name>` while a green build was the deploy
+ * trigger, and a release names a tag instead. V8 dropped the column.
  */
 export interface CdEnvironmentDto {
   readonly id: string;
   readonly name: string;
-  readonly branch: string;
   readonly network: string;
   /**
-   * True on exactly one environment: the tier whose branch deploys the platform plane.
+   * True on exactly one environment: the tier a release enters the platform at, and the tier the
+   * platform plane is deployed into.
    *
-   * It says nothing about what this environment *holds* — a platform service is in every
-   * environment either way, which is why the platform bucket is a root of its own and not this
-   * tier's child. What it decides is which branch is allowed to roll the plane, and that is worth
-   * drawing: it is the answer to "why did my release of qits-platform-idp ship nothing".
+   * It is what this page uses to decide **which environment the platform services are listed
+   * under**. They carry no link into it — that is what being platform-tier means — so the flag is
+   * the only thing that says where they run.
    */
   readonly platform: boolean;
   readonly createdAt: string;
@@ -130,10 +129,17 @@ export interface CdEnvironmentDto {
 /**
  * One deployment of one application.
  *
+ * **`version` is the coordinate and `commitSha` is the commit behind it.** The version is the CalVer
+ * stamp the release minted — the git tag, and the tag the image carries — and it is what a reader
+ * identifies a deployment by. The sha is what that tag resolved to and is nullable: a repository
+ * carrying no deployments.yml answers the spec read with a 404, which says nothing about where the
+ * tag points. On rows written before releases became the trigger it is the other way round —
+ * `version` is null and the sha was the whole coordinate — so both are drawn per-row and neither
+ * absence is an error.
+ *
  * `runId` is the ci run that produced the image, and it is the entire reason the commit cell can
- * link out of this application: qits-deployments has always *received* it on the build intake and
- * now records it. It is null for every row written before that column existed, so the link is drawn
- * per-row and its absence is not an error — it is history.
+ * link out of this application. A `SoftwareRelease` carries none, so only a manual replay supplies
+ * one; the link is drawn per-row and its absence is not an error.
  *
  * `detail` is a clob: the reason an `IMAGE_MISSING` or `FAILED` row is what it is. A row expands in
  * place to show it, which is what stands in for a deployment detail route (Decision 4) —
@@ -143,13 +149,70 @@ export interface CdDeploymentDto {
   readonly id: string;
   readonly applicationId: string;
   readonly applicationName: string;
-  readonly commitSha: string;
+  readonly version: string | null;
+  readonly commitSha: string | null;
   readonly status: CdDeploymentStatus;
   readonly containerName: string | null;
   readonly detail: string | null;
   readonly createdAt: string;
   readonly finishedAt: string | null;
   readonly runId: string | null;
+}
+
+/**
+ * What the quality gate said about a deployment request.
+ *
+ * `MET` is the only word written today — the gate is a placeholder that says yes to every released
+ * version, because qits-ci's pipeline has already had its say. `UNMET` is modelled anyway, and this
+ * screen renders it, because the day a real gate refuses something the refusal has to be visible
+ * somewhere: there is no deployment row for a release that never happened.
+ */
+export type CdQualityGate = 'UNMET' | 'MET';
+
+/**
+ * One deployment request: **this version of this application was asked for here**.
+ *
+ * It is what a `SoftwareRelease` produces, and the deployment is what it produces in turn — request
+ * → gate → deployment. `deploymentId` is the edge to the third step and is null when there is no
+ * third step, which is the whole record of a release that shipped nothing; `gateDetail` says why.
+ *
+ * **The join key is `applicationName`, not an id.** A deployment carries a derived `applicationId`
+ * because its row records which plane it is on; a request records no plane, so the server does not
+ * derive one rather than guessing. A name is unique per tier, which is all this page needs.
+ *
+ * `gateSettledAt` is null while nothing has answered — a state today's placeholder skips, since it
+ * answers in the transaction that writes the row.
+ */
+export interface CdDeploymentRequestDto {
+  readonly id: string;
+  readonly applicationName: string;
+  readonly version: string;
+  readonly environmentId: string | null;
+  readonly packageName: string | null;
+  readonly repoId: string | null;
+  readonly projectId: string | null;
+  readonly qualityGate: CdQualityGate;
+  readonly gateDetail: string | null;
+  readonly deploymentId: string | null;
+  readonly createdAt: string;
+  readonly gateSettledAt: string | null;
+}
+
+/**
+ * Whether this request is still waiting on its gate — asked, and nothing has answered.
+ *
+ * Unreachable today and deliberately implemented anyway: it is the second non-terminal state of the
+ * lifecycle this page follows, beside `QUEUED` and `STARTING`, and it is what the poll will have to
+ * watch the moment a gate takes longer than a transaction. A settled gate that said no is *not* in
+ * flight — it is an outcome, and polling it would never end.
+ */
+export function isPendingGate(request: CdDeploymentRequestDto): boolean {
+  return request.qualityGate === 'UNMET' && request.gateSettledAt === null;
+}
+
+/** Whether the gate refused this request outright: it answered, and it queued nothing. */
+export function isRefused(request: CdDeploymentRequestDto): boolean {
+  return request.qualityGate === 'UNMET' && request.gateSettledAt !== null;
 }
 
 /** cd's environment list envelope. Every environment, which is what makes orphans computable. */
@@ -173,9 +236,18 @@ export interface CdApplicationsResponse {
   readonly applications: readonly CdApplicationDto[];
 }
 
-/** cd's deployment list envelope. Sorted `createdAt desc, id desc` by the server. */
+/** cd's deployment list envelope. Sorted newest-first by the server. */
 export interface CdDeploymentsResponse {
   readonly deployments: readonly CdDeploymentDto[];
+}
+
+/**
+ * cd's deployment-request envelope. Newest-first, and scoped to one environment like the deployment
+ * listing — a platform service's requests are in the tier it deploys into, because that is the tier
+ * its request names.
+ */
+export interface CdDeploymentRequestsResponse {
+  readonly deploymentRequests: readonly CdDeploymentRequestDto[];
 }
 
 /** A project's dns record, or the whole object is null when it registers no domain. */

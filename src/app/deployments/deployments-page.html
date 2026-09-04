@@ -50,6 +50,14 @@
     </p>
   }
 
+  <!--
+    Where the platform bucket's meta line used to say this: with no environment designated, a
+    release enters nowhere at all, and every table below is empty for a reason no row can state.
+  -->
+  @if (noPlatformEnvironment(); as message) {
+    <p class="banner" role="status">⚠ {{ message }}</p>
+  }
+
   @if (projects().kind === 'loading') {
     <app-async [state]="projects()" loadingLabel="Loading projects" />
   }
@@ -70,7 +78,7 @@
                 <app-deployment-table
                   [node]="nodeOf(environment.id)"
                   [busy]="operating()"
-                  (reload)="loadPlane(environment.id)"
+                  (reload)="loadEnvironment(environment.id)"
                   (operate)="operate(environment.id, $event)"
                 />
               } @else {
@@ -94,29 +102,13 @@
     }
 
     <!--
-      A root of its own, because a platform service is in no environment and no project's slug can
-      reach it. Closed on arrival: unlike the bucket below, opening it costs the same two requests
-      every other expansion costs.
+      There is no "Platform services" root here any more, and its absence is the point. A platform
+      service belonged to no environment when this page was written, so a third root beside the
+      projects was the only way to draw one at all. It is deployed into the designated environment
+      now — its deployment rows name that tier like every other row — so it is listed in that
+      environment's table with a `platform` tag on its row, which says the one thing still true of
+      it: it is linked into no environment, so one release of it reaches every tier at once.
     -->
-    <li class="bucket">
-      <app-tree-node
-        label="Platform services"
-        tag="platform"
-        [meta]="platformMeta()"
-        [expanded]="platformOpen()"
-        (toggled)="togglePlatform()"
-      >
-        @if (platformOpen()) {
-          <app-deployment-table
-            [node]="nodeOf(platformPlane)"
-            emptyMessage="No platform service is registered."
-            [busy]="operating()"
-            (reload)="loadPlane(platformPlane)"
-            (operate)="operate(platformPlane, $event)"
-          />
-        }
-      </app-tree-node>
-    </li>
 
     <li class="bucket">
       <app-tree-node
@@ -147,7 +139,7 @@
                   <app-deployment-table
                     [node]="nodeOf(environment.id)"
                     [busy]="operating()"
-                    (reload)="loadPlane(environment.id)"
+                    (reload)="loadEnvironment(environment.id)"
                     (operate)="operate(environment.id, $event)"
                   />
                 }

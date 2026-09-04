@@ -54,4 +54,11 @@ describe('format', () => {
   it('abbreviates a sha the way git does', () => {
     expect(shortSha('9f2c1ab3d4e5f6a7')).toBe('9f2c1ab');
   });
+
+  it('draws no sha at all where a deployment records none', () => {
+    // A real answer since a deployment became a version: the spec read 404s on a repository with no
+    // deployments.yml, which says nothing about where the released tag points. The row keeps its
+    // version and has no commit behind it.
+    expect(shortSha(null)).toBe(NONE);
+  });
 });
