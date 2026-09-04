@@ -50,6 +50,12 @@ describe('StatusBadge', () => {
     expect(await toneOf('GONE')).toContain('danger');
   });
 
+  it('reads SCALED_TO_ZERO as a warning — stopped on purpose, but not serving', async () => {
+    // Not danger: answering the operator's own action with the outage colour would train a reader
+    // to skim past it. Not neutral either: an application nobody restarted is not history.
+    expect(await toneOf('SCALED_TO_ZERO')).toContain('warning');
+  });
+
   it('falls back to neutral for a status this build has never heard of', async () => {
     expect(await toneOf('SOMETHING_NEW')).toContain('neutral');
   });
@@ -59,6 +65,8 @@ describe('StatusBadge', () => {
     expect(await labelOf('ROLLED_BACK')).toContain('Rolled back');
     expect(await labelOf('SUPERSEDED')).toContain('Superseded');
     expect(await labelOf('GONE')).toContain('Gone');
+    // 'Stopped' rather than 'Scaled to zero': the reader is asking whether it is running.
+    expect(await labelOf('SCALED_TO_ZERO')).toContain('Stopped');
   });
 
   it('renders the raw word of a status this build has never heard of, never a blank badge', async () => {

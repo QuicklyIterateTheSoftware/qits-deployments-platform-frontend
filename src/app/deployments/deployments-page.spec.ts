@@ -897,4 +897,134 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('website');
     http.verify();
   });
+  // --- the operator's two levers ----------------------------------------------------------------
+
+  /** Expand a tier holding one application whose newest deployment is in the given state. */
+  async function openTierWith(over: Partial<CdDeploymentDto> = {}): Promise<void> {
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', over)],
+    );
+  }
+
+  function expectOperation(path: string) {
+    return http.expectOne(`/platform-deployments/api/applications/${path}`);
+  }
+
+  it('restarts an application in place and reads the plane back', async () => {
+    // The lever the whole feature exists for: qits-ci up, healthy to its probe, and wedged behind
+    // it. Before this the only recovery was re-firing a same-sha push and waiting for a rebuild.
+    await openTierWith();
+
+    await click('Restart');
+
+    const request = expectOperation('a1/restart');
+    expect(request.request.method).toBe('POST');
+    request.flush({});
+    await settle();
+
+    // Nothing is believed about the outcome: the service answers 202 and the row is the answer, so
+    // the plane is re-read rather than patched in place.
+    await flushEnvironment('e1', [application('a1', 'qits-ci')], [deployment('d1', 'a1')]);
+    expect(text()).toContain('Active');
+  });
+
+  it('asks before stopping, and stops nothing until the question is answered', async () => {
+    // Stopping is the one action here that takes an application off the platform, so it is asked
+    // twice — and the question names the row, because this is a table an operator scans.
+    await openTierWith();
+
+    await click('Stop');
+    expect(text()).toContain('Stop qits-ci?');
+    http.verify(); // nothing was sent by opening the question
+
+    await click('Cancel');
+    expect(text()).not.toContain('Stop qits-ci?');
+    http.verify();
+
+    await click('Stop');
+    await click('Yes, stop it');
+    const request = expectOperation('a1/scale');
+    expect(request.request.body).toEqual({ replicas: 0 });
+    request.flush({});
+    await settle();
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', { status: 'SCALED_TO_ZERO' })],
+    );
+
+    expect(text()).toContain('Stopped');
+  });
+
+  it('offers Start on a stopped application and neither of the other two', async () => {
+    // A stopped row must not offer Stop (an action with no effect) or Restart (which the service
+    // refuses: there is no task to replace). The row's own status is what decides.
+    await openTierWith({ status: 'SCALED_TO_ZERO' });
+
+    const labels = buttons().map((button) => button.textContent ?? '');
+    expect(labels.some((label) => label.includes('Start'))).toBe(true);
+    expect(labels.some((label) => label.includes('Restart'))).toBe(false);
+    expect(labels.some((label) => label.includes('Stop'))).toBe(false);
+
+    await click('Start');
+    const request = expectOperation('a1/scale');
+    expect(request.request.body).toEqual({ replicas: 1 });
+    request.flush({});
+    await settle();
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', { status: 'SCALED_TO_ZERO' })],
+    );
+
+    // Still stopped, and that is correct rather than a bug: qits-deployments settles a started row
+    // when its own observation finds the tasks healthy, which is up to one interval later. This
+    // page must not invent a completion the service never promised.
+    expect(text()).toContain('Stopped');
+  });
+
+  it('draws no lever at all for a deployment that never reached the orchestrator', async () => {
+    // IMAGE_MISSING is the everyday shape: the row exists, the pull failed, and no service anywhere
+    // carries the application. The service answers 409, so the button would be one that cannot work.
+    await openTierWith({ status: 'IMAGE_MISSING', containerName: null });
+
+    expect(text()).toContain('nothing running');
+    const labels = buttons().map((button) => button.textContent ?? '');
+    expect(labels.some((label) => label.includes('Restart'))).toBe(false);
+  });
+
+  it('says beside the table when an operation is refused, and keeps the table', async () => {
+    await openTierWith();
+
+    await click('Restart');
+    expectOperation('a1/restart').flush(null, { status: 403, statusText: 'Forbidden' });
+    await settle();
+
+    expect(text()).toContain('Could not restart qits-ci');
+    expect(text()).toContain('403');
+    // The row is still on screen: a refused action says nothing about what is deployed.
+    expect(text()).toContain('qits-ci-9f2c1ab');
+  });
+
+  it('takes the buttons away while an operation is in flight, so one wedge is one restart', async () => {
+    await openTierWith();
+
+    await click('Restart');
+    await settle();
+
+    expect(text()).toContain('queued…');
+    expect(buttons().map((button) => button.textContent ?? '').some((l) => l.includes('Restart')))
+      .toBe(false);
+
+    expectOperation('a1/restart').flush({});
+    await settle();
+    await flushEnvironment('e1', [application('a1', 'qits-ci')], [deployment('d1', 'a1')]);
+
+    expect(text()).not.toContain('queued…');
+  });
 });

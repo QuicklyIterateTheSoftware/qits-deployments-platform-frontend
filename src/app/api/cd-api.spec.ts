@@ -102,6 +102,38 @@ describe('CdApi', () => {
     await expect(deployments).resolves.toEqual([]);
   });
 
+  it('posts a restart to the application, with no body to get wrong', async () => {
+    const restarted = api.restart('e1:qits-ci');
+    const request = http.expectOne(
+      '/platform-deployments/api/applications/e1%3Aqits-ci/restart',
+    );
+    expect(request.request.method).toBe('POST');
+    request.flush({});
+    await expect(restarted).resolves.toBeUndefined();
+  });
+
+  it('posts a replica count to scale, and the count is the whole request', async () => {
+    // Zero stops it and one starts it; the service refuses anything above one, because every
+    // application on this platform is deployed as a single task.
+    const stopped = api.scale('platform:qits-ci', 0);
+    const request = http.expectOne(
+      '/platform-deployments/api/applications/platform%3Aqits-ci/scale',
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ replicas: 0 });
+    request.flush({});
+    await expect(stopped).resolves.toBeUndefined();
+  });
+
+  it('escapes the colon in an application id rather than letting it reach the path raw', async () => {
+    // The id is `<environmentId>:<name>` and it is one path segment, so the separator has to be
+    // encoded — a raw colon in a segment is legal but is exactly the kind of thing a proxy in front
+    // rewrites.
+    const started = api.scale('e1:qits-ci', 1);
+    http.expectOne('/platform-deployments/api/applications/e1%3Aqits-ci/scale').flush({});
+    await expect(started).resolves.toBeUndefined();
+  });
+
   it('unwraps the deployment requests, filtered by the same environment', async () => {
     // The listing that has no `platform` value: a request records no plane, and a platform
     // service's request names the tier it deploys into, so it comes back in that tier's answer.

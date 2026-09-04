@@ -15,6 +15,14 @@ import { QitsBadge, type QitsBadgeTone } from '@qits/ui-components';
  * it. `ROLLED_BACK` is `warning` for the mirror image of that reason: the update failed, but the
  * orchestrator put the predecessor back and the service never stopped serving.
  *
+ * `SCALED_TO_ZERO` is `warning` and reads **Stopped**, which is the one place this map makes a
+ * judgement rather than a translation. It is not `danger`: somebody stopped this application on
+ * purpose and answering their own action with a red badge would train a reader to skim past the
+ * colour that means an outage. It is not `neutral` either, because a stopped application is not
+ * serving and a table where that looks like ordinary history is a table that hides an outage
+ * somebody forgot to end. The word is `Stopped` rather than `Scaled to zero` because the reader is
+ * an operator asking whether the thing is running, not a person reading a replica count.
+ *
  * `GONE` shares `danger` with `FAILED`, and that is the badge's vocabulary rather than a claim that
  * the two are the same thing. A deployment whose container vanished after it was serving wants
  * attention exactly as loudly as one that never started; `QitsBadgeTone` has five tones and no sixth
@@ -28,6 +36,7 @@ const TONES: Readonly<Record<string, QitsBadgeTone>> = {
   ROLLED_BACK: 'warning',
   FAILED: 'danger',
   GONE: 'danger',
+  SCALED_TO_ZERO: 'warning',
   DECOMMISSIONED: 'neutral',
   SUPERSEDED: 'neutral',
 };
@@ -48,6 +57,7 @@ const LABELS: Readonly<Record<string, string>> = {
   ROLLED_BACK: 'Rolled back',
   FAILED: 'Failed',
   GONE: 'Gone',
+  SCALED_TO_ZERO: 'Stopped',
   DECOMMISSIONED: 'Decommissioned',
   SUPERSEDED: 'Superseded',
 };
