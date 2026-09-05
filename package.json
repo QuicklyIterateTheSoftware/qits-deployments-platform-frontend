@@ -1,6 +1,6 @@
 {
   "name": "qits-spa-deployments",
-  "version": "2026.905.53355",
+  "version": "2026.905.85624",
   "private": true,
   "description": "The deployments frontend: an Angular application that consumes @qits/ui-components from qits' own npm registry. It ships no image — qits-deployments serves it at the root of its own host.",
   "license": "MIT",
