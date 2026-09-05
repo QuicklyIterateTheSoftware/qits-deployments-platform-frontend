@@ -6,6 +6,7 @@ import type {
   CdApplicationDto,
   CdApplicationsResponse,
   CdDeploymentDto,
+  CdDeploymentRequestDetailResponse,
   CdDeploymentRequestDto,
   CdDeploymentRequestsResponse,
   CdDeploymentsResponse,
@@ -169,6 +170,75 @@ export class CdApi {
    */
   async deploymentRequests(environmentId: string): Promise<readonly CdDeploymentRequestDto[]> {
     const params = new HttpParams().set('environmentId', environmentId);
+    const response = await firstValueFrom(
+      this.http.get<CdDeploymentRequestsResponse>(
+        `${this.base}/platform-deployments/api/deployment-requests`,
+        { params },
+      ),
+    );
+    return response.deploymentRequests;
+  }
+
+  /**
+   * One project's deployment requests: everything still moving, and the ten most recent that are
+   * not.
+   *
+   * **The cap is the server's and this method does not restate it.** A project that has been
+   * releasing for a year holds thousands of settled requests, and a client that asked for them in
+   * order to show ten would be downloading the year and throwing it away. What is never capped is
+   * the pending half — a release the platform has not finished with must not be the row a limit
+   * dropped.
+   *
+   * It is scoped by project and **not** by tier, which is why it exists beside the listing above: a
+   * project's releases enter at whichever environment the platform designates, and the designation
+   * moves, so a tier-scoped read would silently lose everything asked for before it did.
+   *
+   * An unknown project answers `200 []` rather than 404, deliberately: qits-deployments holds no
+   * project rows, so "no request here carries that project" is the whole of what it can say.
+   */
+  async projectDeploymentRequests(projectId: string): Promise<readonly CdDeploymentRequestDto[]> {
+    const params = new HttpParams().set('projectId', projectId);
+    const response = await firstValueFrom(
+      this.http.get<CdDeploymentRequestsResponse>(
+        `${this.base}/platform-deployments/api/deployment-requests`,
+        { params },
+      ),
+    );
+    return response.deploymentRequests;
+  }
+
+  /**
+   * One deployment request, with the deployment it produced.
+   *
+   * The deployment travels inside this answer instead of behind a second call, because there is no
+   * deployment-by-id endpoint to make one against — the deployments listing is tier-scoped, and
+   * qits-deployments declined to open a second door onto that table for one screen. `deployment` is
+   * null for a request that queued nothing.
+   */
+  async deploymentRequest(id: string): Promise<CdDeploymentRequestDetailResponse> {
+    return await firstValueFrom(
+      this.http.get<CdDeploymentRequestDetailResponse>(
+        `${this.base}/platform-deployments/api/deployment-requests/${encodeURIComponent(id)}`,
+      ),
+    );
+  }
+
+  /**
+   * Every deployment request written for one released version of one repository, newest first.
+   *
+   * The join followed the other way: a link from a release elsewhere on the platform knows a
+   * repository and a version and nothing about the name this platform deploys under — which may be
+   * the repository's, or the `application:` its spec overrides with, and only qits-deployments
+   * knows which. **Both halves are required**, and the server answers 400 for either alone.
+   *
+   * An empty answer is ordinary rather than an error: a library or an SPA releases a version that
+   * deploys nothing at all.
+   */
+  async deploymentRequestsByRelease(
+    repoId: string,
+    version: string,
+  ): Promise<readonly CdDeploymentRequestDto[]> {
+    const params = new HttpParams().set('repoId', repoId).set('version', version);
     const response = await firstValueFrom(
       this.http.get<CdDeploymentRequestsResponse>(
         `${this.base}/platform-deployments/api/deployment-requests`,

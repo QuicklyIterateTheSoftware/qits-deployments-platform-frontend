@@ -1,0 +1,94 @@
+<header class="head">
+  <div>
+    <p class="crumb"><a [routerLink]="listLink()">Deployment requests</a></p>
+    <h1>{{ subtitle() || 'Deployment request' }}</h1>
+    @if (scoped.name(); as project) {
+      <p class="project-scope">{{ project }}</p>
+    }
+  </div>
+  <div class="actions">
+    @if (following()) {
+      <span class="following" role="status">⟳ {{ following() }}</span>
+    }
+    <qits-button variant="secondary" size="sm" (pressed)="reload()">Refresh</qits-button>
+  </div>
+</header>
+
+@if (pollProblem()) {
+  <p class="banner" role="status">
+    ⚠ The last refresh failed — {{ pollProblem() }}. Showing what was read before it.
+  </p>
+}
+
+<app-async
+  [state]="detail()"
+  loadingLabel="Loading the deployment request"
+  errorLabel="Could not load the deployment request"
+  (retry)="reload()"
+/>
+
+@if (request(); as request) {
+  <app-lifecycle-flow [stages]="stages()" />
+
+  <section class="facts">
+    <h2>The request</h2>
+    <dl>
+      <dt>Gate</dt>
+      <dd>
+        <qits-badge [label]="gateLabel(request)" [tone]="gateTone(request)" />
+        @if (request.gateDetail) {
+          <span class="gate-detail">{{ request.gateDetail }}</span>
+        }
+      </dd>
+
+      <dt>Package</dt>
+      <dd>
+        <code>{{ request.packageName || none }}</code>
+      </dd>
+
+      <dt>Asked</dt>
+      <dd>{{ formatInstant(request.createdAt) }}</dd>
+
+      <dt>Gate answered</dt>
+      <dd>{{ formatInstant(request.gateSettledAt) }}</dd>
+    </dl>
+  </section>
+
+  <section class="facts">
+    <h2>The deployment</h2>
+    <!--
+      Null is the whole record of a release that shipped nothing: a refused request queued no
+      deployment, so there is no row anywhere else that could carry this sentence.
+    -->
+    @if (deployment(); as deployment) {
+      <dl>
+        <dt>Status</dt>
+        <dd><app-status-badge [status]="deployment.status" /></dd>
+
+        <dt>Commit</dt>
+        <dd>
+          <code [title]="deployment.commitSha">{{ shortSha(deployment.commitSha) }}</code>
+        </dd>
+
+        <dt>Container</dt>
+        <dd>
+          <code>{{ deployment.containerName || none }}</code>
+        </dd>
+
+        <dt>Started</dt>
+        <dd>{{ formatInstant(deployment.createdAt) }}</dd>
+
+        <dt>Finished</dt>
+        <dd>{{ formatInstant(deployment.finishedAt) }}</dd>
+      </dl>
+      @if (deployment.detail) {
+        <pre class="detail">{{ deployment.detail }}</pre>
+      }
+    } @else {
+      <p class="none">
+        No deployment was queued for this request — which is the whole record of it, because there
+        is no deployment row anywhere that could say so.
+      </p>
+    }
+  </section>
+}

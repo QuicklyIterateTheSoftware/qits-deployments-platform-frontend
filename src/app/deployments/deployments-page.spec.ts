@@ -138,6 +138,9 @@ describe('DeploymentsPage', () => {
     deploymentId: null,
     createdAt: '2026-07-31T14:09:00Z',
     gateSettledAt: '2026-07-31T14:09:00Z',
+    // The status of the deployment this request points at, joined by the server. This table draws
+    // the deployment's own row for that, so the field is here only because the wire carries it.
+    deploymentStatus: null,
     ...over,
   });
 

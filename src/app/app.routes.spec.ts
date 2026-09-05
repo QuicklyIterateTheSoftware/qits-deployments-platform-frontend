@@ -12,11 +12,14 @@ import {
 import { routes } from './app.routes';
 
 /**
- * The URL grammar: the one page is reachable at the root of this host and under a project slug, and
- * the slug does one visible thing — it opens that project's row without a click.
+ * The URL grammar: every page is reachable at the root of this host and under a project slug, and
+ * the slug does one visible thing on the table — it opens that project's row without a click.
  *
- * `deployments-page.spec.ts` asserts what the table draws. This file asserts only that the address
- * reaches it and that the scope seeds the expansion.
+ * The page specs assert what each screen draws. This file asserts only that the addresses reach
+ * them, that the scope seeds the expansion, and the one ordering that is easy to get wrong:
+ * `by-release` is a literal segment declared before `:requestId`, and Angular matches in
+ * declaration order, so the wrong order would send every release link to a request whose id is the
+ * word `by-release`.
  */
 
 const PROJECTS = [{ id: 'p1', slug: 'qits', name: 'QITS' }];
@@ -87,5 +90,62 @@ describe('routes', () => {
     expect(
       (harness.routeNativeElement as HTMLElement).querySelector('.project-scope')?.textContent,
     ).toBe('QITS');
+  });
+
+  it('draws the requests page at the root, where it asks for nothing', async () => {
+    // Outside a project there is no project id to read by, so the page makes no request at all —
+    // which is why this route is reachable and still costs nothing.
+    const harness = await RouterTestingHarness.create('/deployment-requests');
+    await harness.fixture.whenStable();
+
+    expect(
+      (harness.routeNativeElement as HTMLElement).querySelector('app-deployment-requests-page'),
+    ).not.toBeNull();
+    http.verify();
+  });
+
+  it('draws the requests page under a project slug, and reads that project', async () => {
+    const harness = await RouterTestingHarness.create('/qits/deployment-requests');
+    await harness.fixture.whenStable();
+
+    expect(
+      (harness.routeNativeElement as HTMLElement).querySelector('app-deployment-requests-page'),
+    ).not.toBeNull();
+    http
+      .expectOne(
+        (request) =>
+          request.url === '/platform-deployments/api/deployment-requests' &&
+          request.params.get('projectId') === 'p1',
+      )
+      .flush({ deploymentRequests: [] });
+  });
+
+  it('gives one request a page of its own, by its id', async () => {
+    const harness = await RouterTestingHarness.create('/qits/deployment-requests/r1');
+    await harness.fixture.whenStable();
+
+    expect(
+      (harness.routeNativeElement as HTMLElement).querySelector('app-deployment-request-page'),
+    ).not.toBeNull();
+    http.expectOne('/platform-deployments/api/deployment-requests/r1');
+  });
+
+  it('lets the by-release literal win over the id parameter beside it', async () => {
+    // The ordering claim. With `:requestId` declared first this address would resolve as a request
+    // whose id is `by-release`, and every link from a release would land on a 404 from the server.
+    const harness = await RouterTestingHarness.create(
+      '/qits/deployment-requests/by-release/repo-ci/2026.903.1',
+    );
+    await harness.fixture.whenStable();
+
+    expect(
+      (harness.routeNativeElement as HTMLElement).querySelector('app-deployment-request-resolver'),
+    ).not.toBeNull();
+    http.expectOne(
+      (request) =>
+        request.url === '/platform-deployments/api/deployment-requests' &&
+        request.params.get('repoId') === 'repo-ci' &&
+        request.params.get('version') === '2026.903.1',
+    );
   });
 });
