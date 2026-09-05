@@ -1,0 +1,111 @@
+<header class="head">
+  <div>
+    <h1>Deployment requests</h1>
+    @if (scoped.name(); as project) {
+      <p class="project-scope">{{ project }}</p>
+    }
+    <p class="lede">
+      Every release this project asked the platform for — the gate's record, and what became of it.
+    </p>
+  </div>
+  <div class="actions">
+    @if (following()) {
+      <span class="following" role="status">⟳ {{ following() }}</span>
+    }
+    @if (!scopeless()) {
+      <qits-button variant="secondary" size="sm" (pressed)="reload()">Refresh</qits-button>
+    }
+  </div>
+</header>
+
+<!--
+  Outside a project there is no id to ask with, so nothing is requested at all. An empty list here
+  would be indistinguishable from a project that has never released, and that is a different answer.
+-->
+@if (scopeless()) {
+  <app-empty [message]="scopelessMessage" />
+} @else {
+  @if (pollProblem()) {
+    <p class="banner" role="status">
+      ⚠ The last refresh failed — {{ pollProblem() }}. Showing what was read before it.
+    </p>
+  }
+
+  <app-async
+    [state]="requests()"
+    loadingLabel="Loading deployment requests"
+    errorLabel="Could not load deployment requests"
+    (retry)="reload()"
+  />
+
+  @if (requests().kind === 'ready') {
+    <section>
+      <h2>Pending</h2>
+      <p class="caption">Everything the platform has not finished with.</p>
+      @if (pending().length === 0) {
+        <app-empty message="Nothing is in flight." />
+      } @else {
+        <ng-container [ngTemplateOutlet]="table" [ngTemplateOutletContext]="{ rows: pending() }" />
+      }
+    </section>
+
+    <section>
+      <h2>Completed</h2>
+      <p class="caption">The last {{ completedShown }}, newest first.</p>
+      @if (completed().length === 0) {
+        <app-empty message="No release of this project has settled here yet." />
+      } @else {
+        <ng-container
+          [ngTemplateOutlet]="table"
+          [ngTemplateOutletContext]="{ rows: completed() }"
+        />
+      }
+    </section>
+  }
+}
+
+<ng-template #table let-rows="rows">
+  <table class="requests">
+    <thead>
+      <tr>
+        <th scope="col">Version</th>
+        <th scope="col">Application</th>
+        <th scope="col">Asked</th>
+        <th scope="col">Gate</th>
+        <th scope="col">Deployment</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (request of rows; track request.id) {
+        <tr>
+          <td class="version">
+            <code class="calver">{{ request.version }}</code>
+          </td>
+          <td>{{ request.applicationName }}</td>
+          <td class="when">
+            {{ formatDayTime(request.createdAt) }}
+            <span class="age">{{ formatAge(request.createdAt, now()) }}</span>
+          </td>
+          <td>
+            <qits-badge [label]="gateLabel(request)" [tone]="gateTone(request)" />
+          </td>
+          <td>
+            <!--
+              The status of the deployment this request handed off to, joined by the server. Null is
+              a real answer and the gate is what says which of the two it is.
+            -->
+            @if (request.deploymentStatus; as status) {
+              <app-status-badge [status]="status" />
+            } @else {
+              <span class="none">{{ outcome(request) }}</span>
+            }
+          </td>
+          <td class="open">
+            <a [routerLink]="detailLink(request)">Open</a>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</ng-template>

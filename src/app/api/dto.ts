@@ -196,6 +196,12 @@ export type CdQualityGate = 'UNMET' | 'MET';
  *
  * `gateSettledAt` is null while nothing has answered — a state today's placeholder skips, since it
  * answers in the transaction that writes the row.
+ *
+ * `deploymentStatus` is the one field here that is not the request's own row: it is the status of
+ * the deployment `deploymentId` names, joined by the server so that a client deciding whether this
+ * release is still moving needs no second request. It is null when there is nothing to have a
+ * status — a refusal queued no deployment, and an environment teardown forgets the rows a request
+ * outlives.
  */
 export interface CdDeploymentRequestDto {
   readonly id: string;
@@ -210,6 +216,7 @@ export interface CdDeploymentRequestDto {
   readonly deploymentId: string | null;
   readonly createdAt: string;
   readonly gateSettledAt: string | null;
+  readonly deploymentStatus: CdDeploymentStatus | null;
 }
 
 /**
@@ -227,6 +234,30 @@ export function isPendingGate(request: CdDeploymentRequestDto): boolean {
 /** Whether the gate refused this request outright: it answered, and it queued nothing. */
 export function isRefused(request: CdDeploymentRequestDto): boolean {
   return request.qualityGate === 'UNMET' && request.gateSettledAt !== null;
+}
+
+/**
+ * Whether nothing about this request will change again — the split the requests page draws its two
+ * sections along.
+ *
+ * It mirrors `RequestLifecycle` in qits-deployments, deliberately and field for field: the server
+ * partitions the project listing along this same rule before capping it, so a client that disagreed
+ * would draw a "Completed" section holding rows the server counted as pending and a cap that looks
+ * off by one. Move one, move both.
+ *
+ * The rule is stated as the complement of a POSITIVE in-flight list for the reason the server states
+ * it that way: `CdDeploymentStatus` grows a word every few months, and a `!== 'ACTIVE'` shape would
+ * read each new terminal one as still moving. A **refusal is completed** — the gate answered and
+ * queued nothing, so there is no status at all and polling it would never end.
+ *
+ * The server has already capped the completed half at ten on the project listing, so nothing here
+ * slices: this only decides which section a row is drawn in.
+ */
+export function isCompletedRequest(request: CdDeploymentRequestDto): boolean {
+  if (isPendingGate(request)) {
+    return false;
+  }
+  return request.deploymentStatus === null || !isInFlight(request.deploymentStatus);
 }
 
 /** cd's environment list envelope. Every environment, which is what makes orphans computable. */
@@ -264,6 +295,19 @@ export interface CdDeploymentRequestsResponse {
   readonly deploymentRequests: readonly CdDeploymentRequestDto[];
 }
 
+/**
+ * cd's single deployment-request envelope: the request, and the deployment it handed off to.
+ *
+ * `deployment` is **inlined here rather than fetched**, because there is no deployment-by-id
+ * endpoint to fetch it from — qits-deployments' deployment listing has always been tier-scoped, and
+ * it declined to mint a second door onto that table for one screen. Null is the ordinary answer for
+ * a request that queued nothing.
+ */
+export interface CdDeploymentRequestDetailResponse {
+  readonly deploymentRequest: CdDeploymentRequestDto;
+  readonly deployment: CdDeploymentDto | null;
+}
+
 /** A project's dns record, or the whole object is null when it registers no domain. */
 export interface ProjectDnsRecordDto {
   readonly domain: string;
@@ -288,4 +332,29 @@ export interface ProjectDto {
 /** projects' list envelope: entries, each wrapping the thing it lists. */
 export interface ProjectEntriesResponse {
   readonly entries: readonly { readonly project: ProjectDto }[];
+}
+
+/**
+ * One release request in qits-projects, in the three fields this app reads and no more.
+ *
+ * It is the row a release is cut from over there, and the deployment-request detail page reads
+ * exactly one thing off it: **whether the version it is about has been merged to main**. That is the
+ * last tile of the lifecycle and it is the one fact qits-deployments genuinely cannot know — a
+ * merge happens in the git host after the release, and nothing announces it here.
+ *
+ * Copied by hand and narrowed on purpose, the convention this whole file follows. The record over
+ * there carries a dozen more fields (the reviewer, the gate runs, the branch) and every one of them
+ * would be a shape this app has to keep in step for nothing; a page that reads three fields declares
+ * three. `version` is null on a request that never released, which is why the join below is by
+ * value and never by index.
+ */
+export interface ProjectsReleaseRequestDto {
+  readonly version: string | null;
+  readonly mergedToMainAt: string | null;
+  readonly state: string;
+}
+
+/** projects' release-request envelope. Newest first, and this app reads it for one field. */
+export interface ProjectsReleaseRequestsResponse {
+  readonly requests: readonly ProjectsReleaseRequestDto[];
 }

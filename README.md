@@ -1,7 +1,7 @@
 # qits-deployments-platform-frontend
 
 The CD explorer: what is deployed where, served by qits-deployments itself at the root of
-`deployments.<env>.<domain>` through Quinoa. One screen, no forms — and exactly two writes, which
+`deployments.<env>.<domain>` through Quinoa. Three screens, no forms — and exactly two writes, which
 are operations on a running application rather than changes to the catalogue.
 
 - **`/`** (and `/<projectSlug>/`) — deployments by project. Projects (from qits-projects) → the cd
@@ -10,6 +10,65 @@ are operations on a running application rather than changes to the catalogue.
   project costs three more (the environment's applications, its deployments, its deployment
   requests) and caches. Expansion is carried in the query parameters (`?project=…`), so it is
   bookmarkable and the back button collapses.
+- **`/<projectSlug>/deployment-requests`** — every release the project asked the platform for.
+- **`/<projectSlug>/deployment-requests/<id>`** — one of them, end to end.
+
+## The requests, and why they are a screen of their own
+
+The table above answers *what ran*. A deployment request is what was **asked for**, and the two are
+not the same question: a request the quality gate refuses queues no deployment at all, so it has no
+row in the deployments listing and a reader of that listing alone would see the release as never
+having happened. The front page already folds requests into an application's row — that is the
+`→ 2026.903.12 · gate unmet` cell — but it does so *per tier*, which is right for "what is running
+in dev" and wrong for "what has my project been shipping". A project's releases enter at whichever
+environment the platform designates, and the designation moves.
+
+So the list reads `GET /platform-deployments/api/deployment-requests?projectId=…`, one request, and
+draws two sections: **Pending**, which is everything the platform has not finished with, and
+**Completed**, which is the ten most recent that are. Both halves are decided by the server —
+`RequestLifecycle` there, `isCompletedRequest` here, and the two are written to agree — and the cap
+is the server's too, because a project releasing for a year holds thousands of settled rows and a
+client that asked for them in order to show ten would download the year and throw it away. What is
+never capped is the pending half: a release still moving must not be the row a limit dropped.
+
+Outside a project the page **makes no request at all** and says so in a sentence. An empty list and
+an unscoped one look identical on screen, and they are different answers. The scope is read from the
+address by `@qits/ui-components` exactly as the table reads it — never from the `:project` route
+parameter.
+
+## The lifecycle a request went through
+
+The detail page draws the version's journey as tiles left to right: **Released → Running in
+`<tier>` → Merged to main**. Three of them today, and a list rather than three hard-coded steps,
+because a promotion ladder is the follow-up the request row was written for and a second tier should
+extend this screen rather than rebuild it.
+
+Two of the verdicts are worth stating out loud:
+
+- **Running** is decided by the tier's **newest ACTIVE row**, not by this request's own deployment.
+  A deployment that says `ACTIVE` may have been decommissioned by a newer one an hour later, and a
+  reader asking "is my version live" would be told yes.
+- **Merged to main** is the one step qits-deployments cannot see: the merge happens in the git host
+  after the release and nothing announces it back. It comes from qits-projects' release requests,
+  matched by version — and a read that failed, or a request that named no repository, leaves the
+  tile *pending* with a meta line saying why. Not knowing whether something merged is not knowing
+  it did not, and a version that deployed an hour ago is still a true screen with qits-projects
+  down.
+
+`LifecycleFlow` renders and decides nothing: the page owns the data, so the page builds the array.
+
+**`/deployment-requests/by-release/<repoId>/<version>`** is the address a link from a release lands
+on. The linker cannot know the request's id — it is minted here, on the deploy worker, after the
+release — and publishing it back to qits-projects would be a second coordinate system across a
+boundary that carries none. So the route resolves the pair to an id and redirects with `replaceUrl`,
+which keeps the back button pointing at whatever linked here. A miss is a sentence and a retry
+rather than a 404: releasing a version that deploys nothing is the ordinary shape of a library or an
+SPA, and it is also what a release looks like in the seconds before it reaches this service.
+
+Both pages poll every six seconds while something is still moving, as a `setTimeout` armed **after
+each answer** rather than a `setInterval` — an interval overlaps its own reads when a service is
+slow, which hands it more traffic exactly when it can least take it. A settled release generates no
+traffic and neither does a hidden tab.
 
 ## The two levers
 
