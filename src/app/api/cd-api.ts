@@ -106,8 +106,11 @@ export class CdApi {
    *
    * It is a required filter and the server answers 400 without it and 404 for an environment it does
    * not know, so this is never called speculatively. The "current deployment per application" is the
-   * first row per `applicationId` in what comes back: one client-side pass over an already-sorted
-   * list, and no extra request.
+   * NEWEST row per `applicationId` in what comes back — one client-side pass, no extra request, and
+   * `DeploymentTable.newestFirst` performs the ordering rather than inheriting the one this method
+   * happens to return. This comment used to say "the first row", which was true only while a single
+   * already-sorted listing fed the table; it is not a contract a reader here can check, and reading
+   * it as one is what showed a stale `FAILED` attempt as the state of an `ACTIVE` application.
    */
   async deployments(environmentId: string): Promise<readonly CdDeploymentDto[]> {
     const params = new HttpParams().set('environmentId', environmentId);

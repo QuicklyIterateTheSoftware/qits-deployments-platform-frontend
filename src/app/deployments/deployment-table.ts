@@ -50,21 +50,27 @@ export interface EnvironmentNode {
   readonly requests: Loadable<readonly CdDeploymentRequestDto[]>;
 }
 
+/** Anything this table orders by age: a deployment row, or the request that asked for one. */
+interface Created {
+  readonly createdAt: string;
+}
+
 /**
- * When a deployment was created, in milliseconds, or `null` for a row whose stamp is not a time.
+ * When a row was created, in milliseconds, or `null` for a row whose stamp is not a time.
  *
  * `createdAt` and never `finishedAt`: the question is which attempt is the LATEST, and an attempt
  * that is still running has no finish at all. A row the server sent with an unparseable stamp
- * answers `null` and is ordered by nothing rather than by `NaN`.
+ * answers `null` and is ordered by nothing rather than by `NaN`. The same reasoning holds for a
+ * request, whose `gateSettledAt` is likewise the end of it and null while it is still open.
  */
-function startedAt(deployment: CdDeploymentDto): number | null {
-  const parsed = Date.parse(deployment.createdAt);
+function createdMillis(row: Created): number | null {
+  const parsed = Date.parse(row.createdAt);
   return Number.isNaN(parsed) ? null : parsed;
 }
 
 /**
- * One application's deployments, newest first — **the table's definition of "current", said out
- * loud instead of inherited from the order a list happened to arrive in.**
+ * One application's rows, newest first — **the table's definition of "current", said out loud
+ * instead of inherited from the order a list happened to arrive in.**
  *
  * It used to be inherited. `current` was the first row of the bucket and the bucket was filled in
  * arrival order, so the row an operator reads as the application's state was correct exactly as
@@ -74,6 +80,12 @@ function startedAt(deployment: CdDeploymentDto): number | null {
  * `FAILED` or `IMAGE_MISSING` attempt shown as the current state of an application that is in fact
  * `ACTIVE`, which is an outage reported where there is none.
  *
+ * **It is generic over the two lists because they had the same assumption in them.** Deployments
+ * were fixed first, since that is the bug an operator saw; the deployment *requests* were still
+ * read first-is-newest out of a second listing, so an out-of-order request bucket would draw an
+ * already-deployed version as still outstanding — the same defect one field over, and on the one
+ * cell that exists to say what has NOT shipped yet.
+ *
  * **The comparison is the timestamp, and ties keep the server's order.** `Array.prototype.sort` is
  * stable, so two rows created in the same tick stay in the order the API sent them — which is `seq
  * desc`, the monotonic tiebreak the server has and the wire shape does not carry. That is why the
@@ -82,16 +94,17 @@ function startedAt(deployment: CdDeploymentDto): number | null {
  *
  * Status is deliberately not consulted. The newest row is the current state whatever it says — a
  * deployment that is failing right now must read `Failed`, and a rule that preferred the newest
- * `ACTIVE` row would hide exactly the outage this page exists to show.
+ * `ACTIVE` row would hide exactly the outage this page exists to show. A refused request is the
+ * same: it is the newest thing asked for, and demoting it would hide the refusal.
  */
-function newestFirst(bucket: CdDeploymentDto[]): CdDeploymentDto[] {
+function newestFirst<T extends Created>(bucket: T[]): T[] {
   return bucket.sort((left, right) => {
-    const started = startedAt(left);
-    const other = startedAt(right);
-    if (started === null || other === null || started === other) {
+    const created = createdMillis(left);
+    const other = createdMillis(right);
+    if (created === null || other === null || created === other) {
       return 0;
     }
-    return other - started;
+    return other - created;
   });
 }
 
@@ -724,7 +737,8 @@ export class DeploymentTable {
    * path and be wrong everywhere else: a superseded `FAILED` attempt is history too, and a
    * decommissioned row that is the newest one is the application's current state and belongs in
    * the table rather than behind the affordance. Age is read off `createdAt` here rather than off
-   * the list's order — `newestFirst`.
+   * the list's order — `newestFirst`, and for the requests as well as the deployments, because both
+   * buckets are read head-first and neither listing's order is something this component can check.
    *
    * **Requests join by name and deployments by id**, which is not an inconsistency but the two
    * keys the server offers: a deployment row records its plane so the server derives
@@ -768,6 +782,12 @@ export class DeploymentTable {
       } else {
         byName.set(request.applicationName, [request]);
       }
+    }
+    // And the same for the requests, for the same reason and by the same rule. `outstanding` reads
+    // the head of this bucket, so an order inherited from the listing would let an older request
+    // claim to be the version still waiting — a release drawn as unshipped after it shipped.
+    for (const bucket of byName.values()) {
+      newestFirst(bucket);
     }
 
     const build = (

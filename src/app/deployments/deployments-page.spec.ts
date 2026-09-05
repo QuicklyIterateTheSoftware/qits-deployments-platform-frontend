@@ -685,6 +685,69 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('the userflow suite failed against dev');
   });
 
+  it('reads the newest request as the outstanding one whatever order the list arrives in', async () => {
+    // The request bucket had the same inherited-order assumption the deployment bucket did, one
+    // field over: `outstanding` is the head of it. The listing below arrives OLDER FIRST, so a
+    // table that trusted arrival order would name the already-deployed version as the thing still
+    // waiting and say nothing about the refusal that came after it.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', { version: '2026.903.113443' })],
+      [
+        request('r1', 'qits-ci', { version: '2026.903.113443', deploymentId: 'd1' }),
+        request('r2', 'qits-ci', {
+          version: '2026.903.120000',
+          qualityGate: 'UNMET',
+          gateDetail: 'the userflow suite failed against dev',
+          createdAt: '2026-07-31T15:00:00Z',
+        }),
+      ],
+    );
+
+    expect(page().querySelector('.outstanding')?.textContent).toContain('2026.903.120000');
+    expect(page().querySelector('.outstanding')?.textContent).toContain('gate unmet');
+
+    // And the expansion lists them newest first, which is what the row claims they are.
+    await click('qits-ci');
+    expect(labels('.requests li .calver')).toEqual(['2026.903.120000', '2026.903.113443']);
+  });
+
+  it('leaves nothing outstanding when the newest request is the one that deployed', async () => {
+    // The mirror of the row-choice defect, on the request side: an older refusal arriving first
+    // must not be drawn as a version still waiting when the newest release shipped and is running.
+    // That cell is a false alarm exactly as loud as a stale FAILED row.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [deployment('d1', 'a1', { version: '2026.903.120000' })],
+      [
+        request('r1', 'qits-ci', {
+          version: '2026.903.113443',
+          qualityGate: 'UNMET',
+          gateDetail: 'the userflow suite failed against dev',
+          createdAt: '2026-07-31T13:00:00Z',
+        }),
+        request('r2', 'qits-ci', {
+          version: '2026.903.120000',
+          deploymentId: 'd1',
+          createdAt: '2026-07-31T15:00:00Z',
+        }),
+      ],
+    );
+
+    expect(page().querySelector('.outstanding')).toBeNull();
+    expect(page().querySelector('td.version .calver')?.textContent).toBe('2026.903.120000');
+  });
+
   it('gives a release a row even when the application it names is not in the catalogue', async () => {
     // A request outlives the catalogue row by design — no foreign key, on purpose — so a refusal
     // for a torn-down application still has somewhere to be read. A row that exists and is not
