@@ -94,7 +94,7 @@ table the lever was pressed from is the table that answers. A row whose deployme
 the orchestrator (`IMAGE_MISSING`, and anything else with no container name) draws no lever at all:
 there is no service to act on and the API answers 409.
 
-The levers take `qits-platform:admin`, the same role every read here does: this is a person's
+The levers take `qits:admin`, the same role every read here does: this is a person's
 operational action through the platform edge's forwarded header, and a machine token opens neither.
 
 ## The project in the address
