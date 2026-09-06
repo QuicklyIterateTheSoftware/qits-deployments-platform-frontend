@@ -99,6 +99,11 @@ h2 {
   color: #111827;
 }
 
+/* The release's own word about itself. Blank for a row that carries none, and never wrapped. */
+.priority {
+  white-space: nowrap;
+}
+
 .when,
 .age {
   color: #6b7280;

@@ -202,6 +202,16 @@ export type CdQualityGate = 'UNMET' | 'MET';
  * release is still moving needs no second request. It is null when there is nothing to have a
  * status — a refusal queued no deployment, and an environment teardown forgets the rows a request
  * outlives.
+ *
+ * `priority` is what the release said about itself — `LOWEST`, `LOW`, `MEDIUM`, `HIGH`, `HIGHER` or
+ * `BLOCKING`, carried down from the participating branches of the release request that minted the
+ * version. It is **inert**: nothing here or in qits-deployments orders anything by it, the deploy
+ * queue is still first in, first out, and this screen shows it because a value nobody can read is a
+ * value nobody can act on. It is optional and nullable for the same one reason — the event field is
+ * additive and the server writes no backfill, so every row released before the feature carries no
+ * priority at all, and "the release stated none" is a real answer rather than a gap. Typed as a
+ * string and not a union because this client never decides anything with it: a word a build has not
+ * been taught renders as itself instead of being dropped.
  */
 export interface CdDeploymentRequestDto {
   readonly id: string;
@@ -217,6 +227,7 @@ export interface CdDeploymentRequestDto {
   readonly createdAt: string;
   readonly gateSettledAt: string | null;
   readonly deploymentStatus: CdDeploymentStatus | null;
+  readonly priority?: string | null;
 }
 
 /**

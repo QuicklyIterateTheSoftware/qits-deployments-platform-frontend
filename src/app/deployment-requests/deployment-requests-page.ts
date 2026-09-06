@@ -37,6 +37,41 @@ import { CD_REQUEST_POLL_MS } from './poll-interval';
 export const COMPLETED_SHOWN = 10;
 
 /**
+ * The tone each priority is drawn in, and the rule is: only the loud ones are loud.
+ *
+ * `MEDIUM` is the default every release carries unless somebody said otherwise, so most rows hold
+ * it; a coloured badge on every row is a column of colour that says nothing. `LOWEST`, `LOW` and
+ * `MEDIUM` therefore share `neutral` and are told apart by their word, exactly as the deployment
+ * statuses that are neither a problem nor a running container do. `BLOCKING` is `danger` because it
+ * is the one value that is a claim on somebody's attention rather than a note about a queue.
+ *
+ * None of it changes what happens: the deploy queue is first in, first out and this value is
+ * recorded, never acted on. The colours are a reader's shorthand for what the release asked for.
+ */
+const PRIORITY_TONES: Readonly<Record<string, QitsBadgeTone>> = {
+  LOWEST: 'neutral',
+  LOW: 'neutral',
+  MEDIUM: 'neutral',
+  HIGH: 'info',
+  HIGHER: 'warning',
+  BLOCKING: 'danger',
+};
+
+/**
+ * The word a person reads. The wire spellings are shouted, which is an enum's punctuation and not a
+ * reader's; a value this build has not been taught renders its raw word, which is legible and is
+ * the honest thing to show.
+ */
+const PRIORITY_LABELS: Readonly<Record<string, string>> = {
+  LOWEST: 'Lowest',
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  HIGHER: 'Higher',
+  BLOCKING: 'Blocking',
+};
+
+/**
  * Every release this project asked the platform for: what is still moving, and what happened last.
  *
  * **It is read per PROJECT and by nothing else.** The front page reads requests per tier, folded
@@ -280,6 +315,23 @@ export class DeploymentRequestsPage {
       return 'nothing queued yet';
     }
     return isRefused(request) ? 'nothing was deployed' : 'no deployment row';
+  }
+
+  /**
+   * What the release said about itself, or `''` for a row that said nothing.
+   *
+   * The empty string is what leaves the cell blank, and it is the answer for every release cut
+   * before priorities existed — the server writes no backfill, so absent means absent and inventing
+   * a `Medium` here would put a claim on the screen that no release ever made.
+   */
+  protected priorityLabel(request: CdDeploymentRequestDto): string {
+    const priority = request.priority;
+    return priority ? (PRIORITY_LABELS[priority] ?? priority) : '';
+  }
+
+  /** `neutral` for a word this build has not been taught: a new value is a plain badge, never a crash. */
+  protected priorityTone(request: CdDeploymentRequestDto): QitsBadgeTone {
+    return PRIORITY_TONES[request.priority ?? ''] ?? 'neutral';
   }
 
   /** The sentence for a reader who opened this page outside a project. */

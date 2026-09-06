@@ -154,6 +154,28 @@ describe('DeploymentRequestsPage', () => {
     expect(sections[1].textContent).toContain('nothing was deployed');
   });
 
+  it('shows the priority the release asked for, and leaves the cell blank where it asked for none', async () => {
+    // Absent is the answer for every release cut before the feature — the server writes no backfill
+    // — and it is the assertion that matters here: a cell that said `Medium` on a row's behalf would
+    // put a claim on screen that no release ever made.
+    await open('/qits/deployment-requests');
+    await flushRequests([
+      request('r3', { version: '2026.903.3', priority: 'BLOCKING' }),
+      request('r2', { version: '2026.903.2', priority: 'MEDIUM' }),
+      request('r1', { version: '2026.903.1', priority: null }),
+    ]);
+
+    const cells = Array.from(
+      (harness.fixture.nativeElement as HTMLElement).querySelectorAll('td.priority'),
+    ).map((cell) => cell.textContent?.trim() ?? '');
+    expect(cells).toEqual(['Blocking', 'Medium', '']);
+    // The word is a reader's, not the enum's, and the loud one is the only one drawn loudly.
+    const badges = (harness.fixture.nativeElement as HTMLElement).querySelectorAll(
+      'td.priority qits-badge',
+    );
+    expect(badges).toHaveLength(2);
+  });
+
   it('links each row to its own page, inside the scope the reader is in', async () => {
     await open('/qits/deployment-requests');
     await flushRequests([request('r1')]);

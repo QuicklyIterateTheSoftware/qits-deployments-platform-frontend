@@ -69,6 +69,7 @@
     <thead>
       <tr>
         <th scope="col">Version</th>
+        <th scope="col">Priority</th>
         <th scope="col">Application</th>
         <th scope="col">Asked</th>
         <th scope="col">Gate</th>
@@ -81,6 +82,16 @@
         <tr>
           <td class="version">
             <code class="calver">{{ request.version }}</code>
+          </td>
+          <td class="priority">
+            <!--
+              What the release asked for, and nothing more: the deploy queue is first in, first out
+              and reads this value not at all. A release cut before priorities existed carries none,
+              and the cell is left blank rather than made to say Medium on its behalf.
+            -->
+            @if (priorityLabel(request); as priority) {
+              <qits-badge [label]="priority" [tone]="priorityTone(request)" />
+            }
           </td>
           <td>{{ request.applicationName }}</td>
           <td class="when">

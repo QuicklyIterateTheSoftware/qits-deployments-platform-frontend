@@ -31,6 +31,15 @@ is the server's too, because a project releasing for a year holds thousands of s
 client that asked for them in order to show ten would download the year and throw it away. What is
 never capped is the pending half: a release still moving must not be the row a limit dropped.
 
+Each row also carries the **priority** the release asked for — `LOWEST` through `BLOCKING`, declared
+on the participating branches of the release request that minted the version and carried down the
+chain to the row this page reads. It is drawn and it is **inert**: nothing in qits-deployments orders
+anything by it and the deploy queue is still first in, first out. It is shown because a value nobody
+can read is a value nobody can act on, and because the day the queue does order by it the screen that
+explains an overtake is this one. A release cut before the field existed carries none — there is no
+backfill — and its cell is left **blank** rather than made to claim the `MEDIUM` default on the
+release's behalf.
+
 Outside a project the page **makes no request at all** and says so in a sentence. An empty list and
 an unscoped one look identical on screen, and they are different answers. The scope is read from the
 address by `@qits/ui-components` exactly as the table reads it — never from the `:project` route
