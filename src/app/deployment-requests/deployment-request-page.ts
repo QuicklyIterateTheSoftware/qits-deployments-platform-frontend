@@ -34,6 +34,7 @@ import { CD_REQUEST_POLL_MS } from './poll-interval';
 /** The word a status is drawn with on a stopped tile, where the badge has no room. */
 const STOPPED_WORDS: Readonly<Record<string, string>> = {
   IMAGE_MISSING: 'no image was published',
+  DECLARATION_REFUSED: 'its configuration declaration was refused',
   FAILED: 'the deployment failed',
   ROLLED_BACK: 'rolled back to the predecessor',
   GONE: 'the container went away',

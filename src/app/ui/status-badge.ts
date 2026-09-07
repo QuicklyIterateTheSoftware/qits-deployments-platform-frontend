@@ -27,6 +27,14 @@ import { QitsBadge, type QitsBadgeTone } from '@qits/ui-components';
  * somebody forgot to end. The word is `Stopped` rather than `Scaled to zero` because the reader is
  * an operator asking whether the thing is running, not a person reading a replica count.
  *
+ * `DECLARATION_REFUSED` is `danger`, and it is the one place the "nothing failed here, so it is a
+ * warning" argument that carries `IMAGE_MISSING` and `SPEC_UNREADABLE` does not reach. Both of
+ * those are conditions the deployer is still working through: an image may yet be published, a spec
+ * may yet be served, and the row moves on its own. A refused declaration does not. The release is
+ * over, nothing was scheduled, nothing is serving this version, and the only thing that changes it
+ * is a person editing a file and cutting another release — which is the `FAILED` argument exactly,
+ * so it gets the `FAILED` tone.
+ *
  * `GONE` shares `danger` with `FAILED`, and that is the badge's vocabulary rather than a claim that
  * the two are the same thing. A deployment whose container vanished after it was serving wants
  * attention exactly as loudly as one that never started; `QitsBadgeTone` has five tones and no sixth
@@ -38,6 +46,7 @@ const TONES: Readonly<Record<string, QitsBadgeTone>> = {
   ACTIVE: 'success',
   IMAGE_MISSING: 'warning',
   SPEC_UNREADABLE: 'warning',
+  DECLARATION_REFUSED: 'danger',
   ROLLED_BACK: 'warning',
   FAILED: 'danger',
   GONE: 'danger',
@@ -60,6 +69,7 @@ const LABELS: Readonly<Record<string, string>> = {
   ACTIVE: 'Active',
   IMAGE_MISSING: 'Image missing',
   SPEC_UNREADABLE: 'Spec unreadable',
+  DECLARATION_REFUSED: 'Declaration refused',
   ROLLED_BACK: 'Rolled back',
   FAILED: 'Failed',
   GONE: 'Gone',

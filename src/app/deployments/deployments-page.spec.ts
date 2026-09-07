@@ -627,6 +627,42 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('nothing running');
   });
 
+  it('draws a refused declaration as its own word, and says which cause in the clob', async () => {
+    // DECLARATION_REFUSED: the deployer seeds the release's .config/qits/configuration.yml before
+    // it schedules anything, and this row is what a store that would not take it leaves behind.
+    // Nothing was scheduled, so there is no container and no lever — and the two causes, a refusal
+    // and an unreachable store, are told apart by the clob's first line and by nothing else. This
+    // one is the unreachable half; the request page's suite covers the refusal.
+    await open();
+    await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
+
+    await click('qits');
+    await flushEnvironment(
+      'e1',
+      [application('a1', 'qits-ci')],
+      [
+        deployment('d1', 'a1', {
+          status: 'DECLARATION_REFUSED',
+          containerName: null,
+          detail:
+            'qits-configuration could not be reached — 503 after 4 attempts\n' +
+            'last attempt: connect ECONNREFUSED qits-configuration:8080',
+        }),
+      ],
+    );
+
+    expect(text()).toContain('Declaration refused');
+    expect(text()).not.toContain('DECLARATION_REFUSED');
+    // Nothing reached the orchestrator, so there is no service to restart or stop.
+    expect(text()).toContain('nothing running');
+    expect(text()).not.toContain('could not be reached');
+
+    await click('qits-ci');
+    expect(page().querySelector('.detail')?.textContent).toContain(
+      'qits-configuration could not be reached — 503 after 4 attempts',
+    );
+  });
+
   it('shows what a release asked for beside what it became, on the row it happened to', async () => {
     // The lifecycle a `SoftwareRelease` produces, on one line: request → gate → deployment. The
     // request is folded into the application's row by name, because the deployment on that row is

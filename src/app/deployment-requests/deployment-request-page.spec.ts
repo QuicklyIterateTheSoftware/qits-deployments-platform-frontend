@@ -223,6 +223,42 @@ describe('DeploymentRequestPage', () => {
     expect(text()).not.toContain('following this release');
   });
 
+  it('stops the tier tile when qits-configuration refused the release’s declaration', async () => {
+    // DECLARATION_REFUSED is settled before the deployment rather than after it, and it is the
+    // complement half of `isCompletedRequest` that has to place it: the status is not in the
+    // in-flight list, so the row is completed and the tile is stopped. Were it read as still
+    // moving, this page would poll a release nobody is going to schedule until the tab closed.
+    await open();
+    await flushLoad({
+      request: request({ deploymentStatus: 'DECLARATION_REFUSED' }),
+      deployment: deployment({
+        status: 'DECLARATION_REFUSED',
+        containerName: null,
+        detail:
+          'qits-configuration refused the declaration — 422\n' +
+          '.config/qits/configuration.yml:7 mapping values are not allowed here',
+      }),
+      // Nothing was scheduled, so the tier is serving whatever it was serving before — here,
+      // nothing at all.
+      deployments: [],
+      releaseRequests: [releaseRequest({ mergedToMainAt: null })],
+    });
+
+    expect(tiles()[1]).toEqual(['Running in dev', 'stopped']);
+    expect(text()).toContain('its configuration declaration was refused');
+    expect(text()).toContain('nothing is serving dev');
+    expect(text()).toContain('Declaration refused');
+    expect(text()).not.toContain('DECLARATION_REFUSED');
+    // The clob is the only place the two causes are told apart, so it is drawn whole and unparsed.
+    // `pre.detail` and not `.detail`: a stopped tile draws its own word in a `.detail` of its own,
+    // and the clob is the deployment's.
+    expect(page().querySelector('pre.detail')?.textContent).toContain(
+      'qits-configuration refused the declaration — 422',
+    );
+    // Terminal: nothing here is going to change, so nothing is re-read.
+    expect(text()).not.toContain('following this release');
+  });
+
   it('stops the tier tile when the orchestrator put the predecessor back', async () => {
     await open();
     await flushLoad({

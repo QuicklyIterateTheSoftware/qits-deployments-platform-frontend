@@ -56,6 +56,13 @@ describe('StatusBadge', () => {
     expect(await toneOf('SCALED_TO_ZERO')).toContain('warning');
   });
 
+  it('reads DECLARATION_REFUSED as danger — nothing was scheduled and nothing will be', async () => {
+    // Not the warning tone IMAGE_MISSING and SPEC_UNREADABLE get: those are conditions the deployer
+    // is still working through and the row moves on its own. A refused declaration is over, and
+    // only a person editing a file and cutting another release changes it.
+    expect(await toneOf('DECLARATION_REFUSED')).toContain('danger');
+  });
+
   it('falls back to neutral for a status this build has never heard of', async () => {
     expect(await toneOf('SOMETHING_NEW')).toContain('neutral');
   });
@@ -67,6 +74,7 @@ describe('StatusBadge', () => {
     expect(await labelOf('GONE')).toContain('Gone');
     // 'Stopped' rather than 'Scaled to zero': the reader is asking whether it is running.
     expect(await labelOf('SCALED_TO_ZERO')).toContain('Stopped');
+    expect(await labelOf('DECLARATION_REFUSED')).toContain('Declaration refused');
   });
 
   it('renders the raw word of a status this build has never heard of, never a blank badge', async () => {

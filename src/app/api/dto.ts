@@ -37,6 +37,16 @@
  * learned where this release goes and is reading the file again on its own cadence. Nothing about
  * the repository is being claimed and nothing is running yet — it is a release the server is still
  * working on, which is exactly what this page polls for.
+ *
+ * `DECLARATION_REFUSED` is settled *before* the deployment rather than after it, and it is the only
+ * word here that is: the release's `.config/qits/configuration.yml` was refused by
+ * qits-configuration, or the store could not be reached — the row's detail says which. The deployer
+ * seeds that file before it schedules anything, so nothing was started, nothing was replaced and
+ * whatever was serving before is still serving. It is terminal on purpose and deliberately **not**
+ * in flight: a declaration the store rejected is rejected for as long as the file says what it
+ * says, and a page that polled it would poll until the tab closed. Re-reading the same broken file
+ * is not the wait `SPEC_UNREADABLE` describes — it is a release that needs somebody to fix a file
+ * and cut another one.
  */
 export type CdDeploymentStatus =
   | 'QUEUED'
@@ -44,6 +54,7 @@ export type CdDeploymentStatus =
   | 'ACTIVE'
   | 'IMAGE_MISSING'
   | 'SPEC_UNREADABLE'
+  | 'DECLARATION_REFUSED'
   | 'ROLLED_BACK'
   | 'FAILED'
   | 'GONE'
@@ -157,7 +168,12 @@ export interface CdEnvironmentDto {
  *
  * `detail` is a clob: the reason an `IMAGE_MISSING` or `FAILED` row is what it is. A row expands in
  * place to show it, which is what stands in for a deployment detail route (Decision 4) —
- * qits-deployments has no deployment-by-id endpoint and this screen needs none.
+ * qits-deployments has no deployment-by-id endpoint and this screen needs none. It is also the only
+ * place a `DECLARATION_REFUSED` row says whether qits-configuration *refused* the declaration or
+ * merely could not be *reached*, which the server writes as the clob's first line. That difference
+ * decides who acts — the release's author or whoever owns the store — and this screen draws it by
+ * drawing the clob, unparsed: a client that split the first line off to make a second badge would
+ * be inventing a field the wire does not carry.
  */
 export interface CdDeploymentDto {
   readonly id: string;
