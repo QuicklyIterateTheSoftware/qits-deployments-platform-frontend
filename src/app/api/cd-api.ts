@@ -4,7 +4,6 @@ import { firstValueFrom } from 'rxjs';
 import { QITS_API_BASE } from './api-base';
 import type {
   CdApplicationDto,
-  CdApplicationsResponse,
   CdDeploymentDto,
   CdDeploymentRequestDetailResponse,
   CdDeploymentRequestDto,
@@ -27,7 +26,7 @@ import type {
  *
  * Both answer **202**: qits-deployments runs every orchestrator call on one worker, behind whatever
  * is deploying, so the answer is "queued" and the deployment list is where the result appears. The
- * page therefore re-reads the plane after each call rather than believing the response.
+ * page therefore re-reads the environment after each call rather than believing the response.
  *
  * `HttpClient` on the fetch backend rather than bare `fetch()`, for two reasons that both cash out
  * elsewhere: `HttpTestingController` is the only request-mocking story Angular ships and the specs
@@ -78,32 +77,11 @@ export class CdApi {
   }
 
   /**
-   * Every platform service, off the flat listing that spans both planes.
-   *
-   * **A platform service carries no link into an environment, and this is the only listing that
-   * reaches one.** It runs in the designated environment — its deployment rows say so — but the
-   * catalogue deliberately records no link, which is what makes a tier created tomorrow pick it up.
-   * So the environment aggregate cannot list qits-platform-idp, qits-ci or this component's own row,
-   * and the page merges them in from here.
-   *
-   * **The filter is here rather than on the page**: the listing carries both planes and the server
-   * offers no `?target=`, so somewhere has to drop the tiered entries — and doing it here means the
-   * page merges one list into another rather than partitioning one.
-   */
-  async platformApplications(): Promise<readonly CdApplicationDto[]> {
-    const response = await firstValueFrom(
-      this.http.get<CdApplicationsResponse>(`${this.base}/platform-deployments/api/applications`),
-    );
-    return response.applications.filter((application) => application.target === 'PLATFORM');
-  }
-
-  /**
    * One environment's deployments, newest first, across all of its applications.
    *
-   * **The platform services' rows are in here too**, because a platform service is deployed into the
-   * designated environment and its rows name that tier. Their `applicationId` still reads
-   * `platform:<name>`, which is the same key the flat catalogue gives them — the join holds across
-   * the merge.
+   * **Every row in here is keyed `<environmentId>:<name>`**, the same key the environment's own
+   * catalogue gives its applications, which is what makes the join between the two listings a
+   * lookup rather than a match on the name.
    *
    * It is a required filter and the server answers 400 without it and 404 for an environment it does
    * not know, so this is never called speculatively. The "current deployment per application" is the
@@ -126,9 +104,8 @@ export class CdApi {
   /**
    * Set how many tasks of this application run: `0` stops it, `1` starts it again.
    *
-   * The id is the same derived key the two listings are joined on (`<environmentId>:<name>`, or
-   * `platform:<name>`), which is why this takes no separate plane argument — the key already says
-   * which one.
+   * The id is the same derived key the two listings are joined on, `<environmentId>:<name>`, which
+   * is why this takes no environment argument — the key already names one.
    *
    * Scaling to zero keeps the service and everything about it, so starting it again is the same
    * deployment coming back rather than a new one. That is the entire reason this is a scale and not
@@ -167,9 +144,8 @@ export class CdApi {
    * request the gate refused produced **no deployment at all**, so it cannot be a property of one.
    * This is the only listing in which a release that shipped nothing is visible.
    *
-   * The same required `environmentId` filter, with the same 400 and 404. There is no `platform`
-   * value here — a request records no plane, and a platform service's request names the tier it
-   * deploys into, so it comes back in that tier's listing.
+   * The same required `environmentId` filter, with the same 400 and 404: a request names the tier
+   * it was asked for, and that is the listing it comes back in.
    */
   async deploymentRequests(environmentId: string): Promise<readonly CdDeploymentRequestDto[]> {
     const params = new HttpParams().set('environmentId', environmentId);

@@ -97,11 +97,11 @@ push to `environment/dev` and waiting a quarter of an hour for a rebuild.
   invent a completion it never promised.
 
 All three answer **202** — every orchestrator call runs on one worker behind whatever is deploying —
-so the page re-reads the environment after each and believes nothing about the response. There is
-no separate plane to read back: a platform service's rows are in the tier it deploys into, so the
-table the lever was pressed from is the table that answers. A row whose deployment never reached
-the orchestrator (`IMAGE_MISSING`, and anything else with no container name) draws no lever at all:
-there is no service to act on and the API answers 409.
+so the page re-reads the environment after each and believes nothing about the response. The table
+the lever was pressed from is the table that answers, because every row in it is an application of
+that one environment. A row whose deployment never reached the orchestrator (`IMAGE_MISSING`, and
+anything else with no container name) draws no lever at all: there is no service to act on and the
+API answers 409.
 
 The levers take `qits:admin`, the same role every read here does: this is a person's
 operational action through the platform edge's forwarded header, and a machine token opens neither.
@@ -152,21 +152,16 @@ answers so that the first real refusal is visible the day it happens rather than
 A failed request read does not take the table down with it — it is drawn without them, behind a
 line naming what is missing. The table is still exactly what the service said ran.
 
-## Platform services
+## The designated environment
 
-There is no "Platform services" section, and its absence is deliberate. There was one, and it was
-right while a platform service belonged to no environment at all: no project and no tier could lead
-to it. A platform service is deployed **into the designated environment** now and its deployment
-rows name that tier, so it is one more row in that environment's table, carrying a quiet `platform`
-tag that says the one thing still true of it — it is linked into no environment, which is why one
-release of it reaches every tier at once.
+Exactly one environment carries the `platform` flag, and it means one thing: **that is where a
+release enters the platform**. The page says so on that environment's own row, and an install where
+nothing carries it deploys nothing anywhere — which the page says in a banner, because it is the one
+fact about this screen that no row can state.
 
-The catalogue still cannot list them through the environment (a platform service holds no link, on
-purpose, so a tier created tomorrow picks it up), so they come off the flat
-`GET /platform-deployments/api/applications` and are merged into the one environment whose
-`platform` flag says the plane deploys there. That fourth request is made for that environment only.
-An install with no environment designated deploys nothing anywhere, and the page says so in a
-banner — the one fact about this screen that no row can state.
+Every service the page lists belongs to an environment, so a project or the unmatched bucket is the
+whole of the way in; there is no third root and no row that is drawn anywhere but under the
+environment it runs in.
 
 The base path is `/`: qits-deployments serves this app at the root of its own host, so `baseHref`
 here spells no segment at all. The `/platform-deployments` segment survives only as that service's

@@ -90,27 +90,18 @@ export function isInFlight(status: CdDeploymentStatus): boolean {
 }
 
 /**
- * Which plane an application is deployed on: one tier's, or the platform's own.
- *
- * **It no longer says where the thing runs.** A platform service is deployed *into* the main
- * environment like everything else — the flag survives because it still decides three things the
- * server cares about (a bare wire alias, membership in every tier's network, and the `platform:`
- * key its rows are joined on) and one this screen cares about: it is worth saying, on the row, that
- * this service is not the tier's own.
- */
-export type CdDeploymentTarget = 'ENVIRONMENT' | 'PLATFORM';
-
-/**
- * One tracked application, flattened into one tier.
+ * One tracked application, in the environment it belongs to. Its id is `<environmentId>:<name>`,
+ * which is the key its deployment rows are joined on.
  *
  * `repoId` is displayed and never joined on: the applications in qits-deployments are seeded with
  * the git-host directory name, the same string `CiRun.repoId` carries, but this page's only join is
  * environment-to-project by name, so `repoId` is a column and nothing more.
  *
- * `environmentId` and `environmentName` are null exactly when `target` is `PLATFORM`, and they mean
- * **"carries no link"** rather than "runs nowhere": a platform service is deployed into the
- * designated environment and its deployment rows say so. The absence here is the catalogue's, which
- * is what makes a tier created tomorrow pick the service up.
+ * `environmentId` and `environmentName` stay **nullable here** because this type describes what the
+ * client reads and not what the server promises: nothing on this screen breaks on an entry that
+ * carries no link, and narrowing them would be this file asserting an invariant it cannot check.
+ * Every row is read out of an environment's own aggregate, so the link is never the thing a reader
+ * is missing.
  *
  * There is no `branch`. A release names a tag, so nothing in this catalogue has a deploy ref of its
  * own any more; the server dropped the field.
@@ -121,7 +112,6 @@ export interface CdApplicationDto {
   readonly name: string;
   readonly environmentId: string | null;
   readonly environmentName: string | null;
-  readonly target: CdDeploymentTarget;
   readonly availableOnEnv: boolean;
   readonly healthPath: string | null;
   readonly createdAt: string;
@@ -139,12 +129,12 @@ export interface CdEnvironmentDto {
   readonly name: string;
   readonly network: string;
   /**
-   * True on exactly one environment: the tier a release enters the platform at, and the tier the
-   * platform plane is deployed into.
+   * True on exactly one environment: **the tier a release enters the platform at**, and therefore
+   * the tier it is deployed into.
    *
-   * It is what this page uses to decide **which environment the platform services are listed
-   * under**. They carry no link into it — that is what being platform-tier means — so the flag is
-   * the only thing that says where they run.
+   * It is the server's designation and this client only reads it, on one row and in one banner: an
+   * install with none designated is one where a release enters nowhere and nothing deploys at all,
+   * which is a fact about the whole screen that no table can state.
    */
   readonly platform: boolean;
   readonly createdAt: string;
@@ -207,8 +197,9 @@ export type CdQualityGate = 'UNMET' | 'MET';
  * third step, which is the whole record of a release that shipped nothing; `gateDetail` says why.
  *
  * **The join key is `applicationName`, not an id.** A deployment carries a derived `applicationId`
- * because its row records which plane it is on; a request records no plane, so the server does not
- * derive one rather than guessing. A name is unique per tier, which is all this page needs.
+ * — `<environmentId>:<name>`, which it has an environment to derive from; a request is written
+ * before anything is scheduled and the server declines to guess one for it. A name is unique per
+ * tier, which is all this page needs.
  *
  * `gateSettledAt` is null while nothing has answered — a state today's placeholder skips, since it
  * answers in the transaction that writes the row.
@@ -297,17 +288,6 @@ export interface CdEnvironmentResponse {
   readonly environment: CdEnvironmentDto;
 }
 
-/**
- * cd's flat application listing: every application on both planes, one entry per tier.
- *
- * The only listing that reaches a platform service at all. Reading the catalogue through the
- * environments leaves qits-platform-idp and qits-deployments itself out of it, because neither
- * belongs to a tier.
- */
-export interface CdApplicationsResponse {
-  readonly applications: readonly CdApplicationDto[];
-}
-
 /** cd's deployment list envelope. Sorted newest-first by the server. */
 export interface CdDeploymentsResponse {
   readonly deployments: readonly CdDeploymentDto[];
@@ -315,8 +295,7 @@ export interface CdDeploymentsResponse {
 
 /**
  * cd's deployment-request envelope. Newest-first, and scoped to one environment like the deployment
- * listing — a platform service's requests are in the tier it deploys into, because that is the tier
- * its request names.
+ * listing — a request names the tier it was asked for, and that is the listing it comes back in.
  */
 export interface CdDeploymentRequestsResponse {
   readonly deploymentRequests: readonly CdDeploymentRequestDto[];

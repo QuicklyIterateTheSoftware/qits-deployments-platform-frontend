@@ -73,8 +73,8 @@ describe('routes', () => {
     expect(
       (harness.routeNativeElement as HTMLElement).querySelector('app-deployments-page'),
     ).not.toBeNull();
-    // The scope seeded the expansion, so the plane behind the scoped project was read without a
-    // click — the two requests an open row costs.
+    // The scope seeded the expansion, so the environment behind the scoped project was read
+    // without a click — the two requests an open row costs.
     http.expectOne('/platform-deployments/api/environments/e1').flush({
       environment: { id: 'e1', name: 'qits', platform: false, applications: [] },
     });

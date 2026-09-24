@@ -73,24 +73,6 @@ describe('CdApi', () => {
     await expect(applications).resolves.toEqual([]);
   });
 
-  it('takes the platform services off the flat listing and leaves the tiered ones', async () => {
-    // `GET /applications` is the only listing that reaches the platform plane, and it carries both
-    // planes — so the client is where the tiered entries go, and the plane is what comes back.
-    const applications = api.platformApplications();
-    http.expectOne('/platform-deployments/api/applications').flush({
-      applications: [
-        {
-          id: 'platform:qits-platform-idp',
-          repoId: 'qits-platform-idp',
-          name: 'qits-platform-idp',
-          target: 'PLATFORM',
-        },
-        { id: 'e1:qits-stt', repoId: 'qits-stt', name: 'qits-stt', target: 'ENVIRONMENT' },
-      ],
-    });
-    await expect(applications).resolves.toMatchObject([{ id: 'platform:qits-platform-idp' }]);
-  });
-
   it('filters deployments by environment, which the service requires', async () => {
     const deployments = api.deployments('e1');
     const request = http.expectOne(
@@ -115,10 +97,8 @@ describe('CdApi', () => {
   it('posts a replica count to scale, and the count is the whole request', async () => {
     // Zero stops it and one starts it; the service refuses anything above one, because every
     // application on this platform is deployed as a single task.
-    const stopped = api.scale('platform:qits-ci', 0);
-    const request = http.expectOne(
-      '/platform-deployments/api/applications/platform%3Aqits-ci/scale',
-    );
+    const stopped = api.scale('e1:qits-ci', 0);
+    const request = http.expectOne('/platform-deployments/api/applications/e1%3Aqits-ci/scale');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ replicas: 0 });
     request.flush({});
@@ -135,8 +115,8 @@ describe('CdApi', () => {
   });
 
   it('unwraps the deployment requests, filtered by the same environment', async () => {
-    // The listing that has no `platform` value: a request records no plane, and a platform
-    // service's request names the tier it deploys into, so it comes back in that tier's answer.
+    // A request names the tier it was asked for, so it comes back in that tier's answer and the
+    // same required filter decides which one.
     const requests = api.deploymentRequests('e1');
     http
       .expectOne(

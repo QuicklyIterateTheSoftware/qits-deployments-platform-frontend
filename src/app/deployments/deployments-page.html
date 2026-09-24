@@ -51,8 +51,8 @@
   }
 
   <!--
-    Where the platform bucket's meta line used to say this: with no environment designated, a
-    release enters nowhere at all, and every table below is empty for a reason no row can state.
+    A banner because it is about the whole page: with no environment designated, a release enters
+    nowhere at all, and every table below is empty for a reason no row can state.
   -->
   @if (noPlatformEnvironment(); as message) {
     <p class="banner" role="status">⚠ {{ message }}</p>
@@ -100,15 +100,6 @@
         <li><app-empty message="No projects yet." /></li>
       }
     }
-
-    <!--
-      There is no "Platform services" root here any more, and its absence is the point. A platform
-      service belonged to no environment when this page was written, so a third root beside the
-      projects was the only way to draw one at all. It is deployed into the designated environment
-      now — its deployment rows name that tier like every other row — so it is listed in that
-      environment's table with a `platform` tag on its row, which says the one thing still true of
-      it: it is linked into no environment, so one release of it reaches every tier at once.
-    -->
 
     <li class="bucket">
       <app-tree-node

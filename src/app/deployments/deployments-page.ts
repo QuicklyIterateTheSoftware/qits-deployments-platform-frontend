@@ -85,23 +85,14 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * explorer, whose run listing
  * takes a mandatory repository filter and therefore cannot see its own orphans without one.
  *
- * **The platform services are listed under the environment they are deployed to, and there is no
- * section for them.** There used to be: a platform service belonged to no environment at all, so no
- * project and no tier could lead to it and a third root was the only way to draw it. It belongs to
- * one now — the designated environment is where the plane is deployed, and its deployment rows name
- * that tier like any other — so it is one more row in that tier's table, with a `platform` tag on
- * the row saying the one thing that is still true of it: it is linked into no environment, which is
- * why one release of it reaches every tier at once. The section outlived the model it came from,
- * and a root that holds services that *are* in an environment is a lie about where they run.
- *
- * The catalogue still cannot list them through the environment — a platform service carries no link,
- * deliberately — so `GET /applications` is where they come from, and the page merges that listing
- * into the one environment whose `platform` flag says the plane deploys there.
+ * Every service on this screen is an environment's, and the two roots above are therefore the whole
+ * of it: an application is reached through the project that names its environment, or through the
+ * bucket, and there is no third way in.
  *
  * **Two requests on load, both flat lists**; everything below costs a click (Decision 3). Expanding
  * a project costs three more — the environment's applications, its deployments and its deployment
- * requests, none of which the listing carries — and a fourth for the designated environment, whose
- * platform services come off the flat catalogue.
+ * requests, none of which the listing carries — and the same three for every environment, so the
+ * cost of an expansion is one number and not two.
  *
  * Expansion lives in the query parameters
  * (`/platform-deployments/?project=…`, and `env=` for the bucket) rather than in path segments: it
@@ -139,10 +130,7 @@ export class DeploymentsPage {
   /** Every environment cd holds — the other half of both orphan directions. */
   protected readonly environments = signal<Loadable<readonly CdEnvironmentDto[]>>(LOADING);
 
-  /**
-   * Per environment, its applications — the tier's own, plus the platform services where the plane
-   * deploys. A missing key is an environment nobody has expanded.
-   */
+  /** Per environment, its applications. A missing key is an environment nobody has expanded. */
   protected readonly applications = signal<
     ReadonlyMap<string, Loadable<readonly CdApplicationDto[]>>
   >(new Map());
@@ -174,8 +162,8 @@ export class DeploymentsPage {
   protected readonly pollProblem = signal('');
 
   /**
-   * The applications with an operation in flight, by id — one set across every plane, because an
-   * application id already names its plane (`<environmentId>:<name>`, `platform:<name>`).
+   * The applications with an operation in flight, by id — one set across the whole page, because an
+   * application id already names its environment (`<environmentId>:<name>`).
    *
    * It exists because the service answers 202: nothing has happened yet when the call returns, and
    * a row that kept offering its buttons in that window would let an operator queue three restarts
@@ -235,13 +223,13 @@ export class DeploymentsPage {
   });
 
   /**
-   * The environment a release enters the platform at and the platform plane is deployed into, or
-   * null while the environments are loading and when none is designated. Exactly one row carries
-   * the flag; `find` rather than a lookup because the server holds that invariant, not this client.
+   * The environment a release enters the platform at, or null while the environments are loading
+   * and when none is designated. Exactly one row carries the flag; `find` rather than a lookup
+   * because the server holds that invariant, not this client.
    *
-   * It is what decides where the platform services are listed. They carry no link into it — that is
-   * what being platform-tier means — so this flag is the only thing on the wire that says where
-   * they run, and an install with none designated is one where nothing can deploy at all.
+   * It is read for two sentences and for nothing else — the designation said out loud on the
+   * environment's own row, and the banner for an install that designates none, where a release
+   * enters nowhere and nothing deploys at all.
    */
   protected readonly platformEnvironment = computed(
     () => this.environmentList().find((environment) => environment.platform) ?? null,
@@ -396,15 +384,9 @@ export class DeploymentsPage {
    * awaited, so the keys exist by the time the expansion effect could run again and no request is
    * issued twice.
    *
-   * **The applications are the tier's own plus, for the designated environment, the platform
-   * services.** That merge is here rather than in the table because it is a fact about the API and
-   * not about rendering: the catalogue deliberately records no link for a platform service, so the
-   * environment aggregate cannot list one, and the flat listing is the only place it exists. Below
-   * this line a platform service is one more application in this environment, which is what it is.
-   *
-   * A failed catalogue read fails the environment; a failed platform read does not, and that
-   * asymmetry is deliberate — the tier's own services are the table, and the platform ones are
-   * additions to it. Losing them costs rows, and losing the tier's costs the table.
+   * The applications come from the environment's own aggregate and from nowhere else: an
+   * environment's catalogue is the whole list of what it tracks, so the table is one read and a
+   * failed one is an environment that did not load rather than a table missing some of its rows.
    */
   protected async loadEnvironment(environmentId: string): Promise<void> {
     this.applications.update((map) => withEntry(map, environmentId, LOADING));
@@ -413,15 +395,8 @@ export class DeploymentsPage {
     await Promise.all([
       (async () => {
         try {
-          // In parallel, not in sequence: they are two independent listings, and chaining them
-          // would put the flat catalogue's latency behind the aggregate's for no reason.
-          const [own, platform] = await Promise.all([
-            this.cdApi.applications(environmentId),
-            this.platformApplicationsOf(environmentId),
-          ]);
-          this.applications.update((map) =>
-            withEntry(map, environmentId, ready([...own, ...platform])),
-          );
+          const applications = await this.cdApi.applications(environmentId);
+          this.applications.update((map) => withEntry(map, environmentId, ready(applications)));
         } catch (error) {
           this.applications.update((map) => withEntry(map, environmentId, failed(error)));
         }
@@ -443,26 +418,6 @@ export class DeploymentsPage {
         }
       })(),
     ]);
-  }
-
-  /**
-   * The platform services, for the one environment the plane deploys into, and `[]` for every
-   * other — so the flat catalogue is read once per expansion of that environment and never at all
-   * for the rest.
-   *
-   * A read that fails answers `[]` rather than failing the environment: see `loadEnvironment`.
-   */
-  private async platformApplicationsOf(
-    environmentId: string,
-  ): Promise<readonly CdApplicationDto[]> {
-    if (this.platformEnvironment()?.id !== environmentId) {
-      return [];
-    }
-    try {
-      return await this.cdApi.platformApplications();
-    } catch {
-      return [];
-    }
   }
 
   /**
@@ -537,10 +492,9 @@ export class DeploymentsPage {
   /**
    * Perform one operator action and read the environment back.
    *
-   * **There is no plane to read separately any more.** A platform service is deployed into the
-   * designated environment and its rows are in that environment's listing, so the table an operator
-   * acted from and the read that settles it are the same one — which is why this takes an
-   * environment id rather than the plane the button belonged to.
+   * The table an operator acted from and the read that settles it are the same one, which is why
+   * this takes an environment id and nothing else: every row in that table is an application of
+   * that environment.
    *
    * **The re-read is the whole answer**, and it is why nothing here believes the response.
    * qits-deployments runs every orchestrator call on one worker behind whatever is deploying, so a
@@ -609,8 +563,8 @@ export class DeploymentsPage {
 
   /**
    * The environment's own line. No branch — a release names a tag, and the column is gone from the
-   * API — and the platform designation is said out loud, because it is what explains why the
-   * platform services are in this tier's table and in no other's.
+   * API — and the platform designation is said out loud, because it is what explains why every
+   * release on this platform enters here and nowhere else.
    */
   protected environmentMeta(environment: CdEnvironmentDto): string {
     const meta = `network ${environment.network}`;
@@ -638,8 +592,7 @@ export class DeploymentsPage {
    *
    * The one fact the tables cannot show, because it is about their absence: a release enters the
    * platform at the designated environment, so with none designated nothing deploys anywhere and
-   * every table on this page is empty for a reason no row can state. It replaced the platform
-   * bucket's meta line, which was where this used to be said.
+   * every table on this page is empty for a reason no row can state.
    *
    * Silent while the environments are still loading — an unanswered question is not a missing
    * designation.

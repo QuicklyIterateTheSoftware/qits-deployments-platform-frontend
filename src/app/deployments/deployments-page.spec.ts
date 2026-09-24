@@ -18,14 +18,12 @@ import { POLL_INTERVAL_MS } from './deployments-page';
 /**
  * The states table, one `it` at a time, driven through `HttpTestingController`.
  *
- * Four assertions carry more than their length. **Both orphan directions**, because a project with
+ * Three assertions carry more than their length. **Both orphan directions**, because a project with
  * no environment and an environment with no project are the two ways this page's one join can be
  * false, and hiding either would turn a convention into a claim. **The collapsed node that makes no
  * request**, because an eager fan-out looks identical on screen and simply costs a request per
- * environment. **The poll that stops**, because a poll that does not stop is invisible in review:
- * the table looks right and the tab re-reads a settled deployment list forever. And **the platform
- * service listed under its environment**, because the section that used to hold it was the visible
- * half of a model in which it belonged to no environment at all — one that is no longer true.
+ * environment. And **the poll that stops**, because a poll that does not stop is invisible in
+ * review: the table looks right and the tab re-reads a settled deployment list forever.
  */
 /** Where the environment itself is served, as the navigation states it. */
 const ENVIRONMENT_ORIGIN = 'https://dev.example.com';
@@ -81,25 +79,11 @@ describe('DeploymentsPage', () => {
     name,
     environmentId: 'e1',
     environmentName: 'qits',
-    target: 'ENVIRONMENT',
     availableOnEnv: false,
     healthPath: null,
     createdAt: '2026-07-01T00:00:00Z',
     ...over,
   });
-
-  /**
-   * A platform service, as the flat listing carries it: **no link into any environment**, which is
-   * not the same as no environment. It is deployed into the designated one, and its id still reads
-   * `platform:<name>` — the key its deployment rows are derived under, so the join survives the
-   * merge into that environment's table.
-   */
-  const platformApplication = (name: string): CdApplicationDto =>
-    application(`platform:${name}`, name, {
-      environmentId: null,
-      environmentName: null,
-      target: 'PLATFORM',
-    });
 
   const deployment = (
     id: string,
@@ -269,27 +253,18 @@ describe('DeploymentsPage', () => {
 
   /**
    * The three requests an expansion costs, answered together: the environment's own catalogue, its
-   * deployments, and the versions asked for in it.
-   *
-   * `platformApplications` is the fourth, and only the designated environment costs it — a platform
-   * service carries no link, so the aggregate cannot list it and the flat catalogue is where it
-   * comes from. Passing it here says "this environment is the one the plane deploys into".
+   * deployments, and the versions asked for in it. Three for every environment — the catalogue is
+   * the whole of what a tier tracks, so there is never a fourth read to merge anything in.
    */
   async function flushEnvironment(
     environmentId: string,
     applications: readonly CdApplicationDto[],
     deployments: readonly CdDeploymentDto[],
     requests: readonly CdDeploymentRequestDto[] = [],
-    platformApplications: readonly CdApplicationDto[] | null = null,
   ): Promise<void> {
     http.expectOne(`/platform-deployments/api/environments/${environmentId}`).flush({
       environment: { ...environment(environmentId, environmentId), applications },
     });
-    if (platformApplications !== null) {
-      http
-        .expectOne('/platform-deployments/api/applications')
-        .flush({ applications: platformApplications });
-    }
     expectDeployments(environmentId).flush({ deployments });
     expectRequests(environmentId).flush({ deploymentRequests: requests });
     await settle();
@@ -375,90 +350,29 @@ describe('DeploymentsPage', () => {
     expect(text()).toContain('Active');
   });
 
-  it('has no platform section, and lists the platform services under the environment they deploy into', async () => {
-    // The change this holds. There WAS a "Platform services" root, and it was right while a
-    // platform service belonged to no environment: no project and no tier could reach one. It is
-    // deployed into the designated environment now, so it is one more row in that environment's
-    // table — and a section for services that ARE in an environment is a claim about where they run.
+  it('expands the designated environment on the same three requests as any other', async () => {
+    // The designation decides where a release enters the platform and nothing about how this page
+    // reads a tier: an environment's catalogue is the whole of what it tracks, so an expansion is
+    // three reads everywhere, and a fourth would be this page merging in rows nothing answers for.
     await open();
     await flushRoots(
       [project('p1', 'qits', 'qits')],
       [environment('e1', 'qits', { platform: true })],
     );
 
-    expect(text()).not.toContain('Platform services');
-
     await click('qits');
-    await flushEnvironment(
-      'e1',
-      [application('a1', 'qits-stt')],
-      [
-        deployment('d1', 'a1'),
-        deployment('dp1', 'platform:qits-platform-idp', {
-          applicationName: 'qits-platform-idp',
-        }),
-      ],
-      [],
-      [platformApplication('qits-platform-idp'), platformApplication('qits-ci')],
-    );
+    await flushEnvironment('e1', [application('a1', 'qits-stt')], [deployment('d1', 'a1')]);
 
-    // One table, both kinds of service, sorted by name — the tier's own and the plane's beside it.
-    expect(labels('td.version .calver').length).toBe(2);
-    expect(text()).toContain('qits-stt');
-    expect(text()).toContain('qits-platform-idp');
-    // The join survives the merge: the deployment's `platform:<name>` id is the same key the flat
-    // catalogue gives the application, so the row is Active rather than never deployed.
-    expect(text()).toContain('Active');
-    // And the never-deployed claim holds for a platform service too, for the same reason it always
-    // did: the row comes from the catalogue, not from a deployment.
-    expect(text()).toContain('qits-ci');
-    expect(text()).toContain('never deployed');
-    // The one thing still worth saying on the row: it is linked into no environment.
-    expect(labels('.tier')).toContain('platform');
-  });
-
-  it('reads the flat catalogue for the designated environment only', async () => {
-    // Every other environment costs three requests, not four. A platform service runs in exactly
-    // one tier, and asking the flat catalogue on behalf of the others would list it in all of them.
-    await open();
-    await flushRoots(
-      [project('p1', 'qits', 'qits'), project('p2', 'website', 'website')],
-      [environment('e1', 'qits', { platform: true }), environment('e2', 'website')],
-    );
-
-    await click('website');
-    await flushEnvironment('e2', [application('a2', 'qits-web')], []);
-
-    // No `GET /applications` was made, and nothing else is outstanding.
+    // The three the helper answered are all of them, and nothing else is outstanding.
     http.verify();
-    expect(text()).toContain('qits-web');
-    expect(labels('.tier')).not.toContain('platform');
-  });
-
-  it('keeps the tiered entries of the flat catalogue out of the merge', async () => {
-    await open();
-    await flushRoots([], [environment('e1', 'qits', { platform: true })]);
-
-    await click('qits');
-    await flushEnvironment(
-      'e1',
-      [],
-      [],
-      [],
-      [platformApplication('qits-platform-idp'), application('e2:qits-stt', 'qits-stt')],
-    );
-
-    // `GET /applications` spans both planes — it is the listing that reaches the platform, not a
-    // platform listing. A tier's application arrives through that tier's own aggregate or not at
-    // all; merging the flat listing's tiered entries would put another environment's rows here.
-    expect(text()).toContain('qits-platform-idp');
-    expect(text()).not.toContain('qits-stt');
+    expect(text()).toContain('qits-stt');
+    expect(text()).toContain('Active');
   });
 
   it('says nothing can deploy when no environment is the platform one', async () => {
     // Reachable on a half-bootstrapped install, and silent everywhere else: a release would enter
-    // nowhere and report no error, so this page is where it shows. It used to be the platform
-    // bucket's meta line; with the bucket gone it is a banner, because it is about the whole page.
+    // nowhere and report no error, so this page is where it shows. A banner rather than a row,
+    // because it is about the whole page — every table on it is empty, and none can say why.
     await open();
     await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
 
@@ -1114,7 +1028,7 @@ describe('DeploymentsPage', () => {
     return http.expectOne(`/platform-deployments/api/applications/${path}`);
   }
 
-  it('restarts an application in place and reads the plane back', async () => {
+  it('restarts an application in place and reads the environment back', async () => {
     // The lever the whole feature exists for: qits-ci up, healthy to its probe, and wedged behind
     // it. Before this the only recovery was re-firing a same-sha push and waiting for a rebuild.
     await openTierWith();
@@ -1127,7 +1041,7 @@ describe('DeploymentsPage', () => {
     await settle();
 
     // Nothing is believed about the outcome: the service answers 202 and the row is the answer, so
-    // the plane is re-read rather than patched in place.
+    // the environment is re-read rather than patched in place.
     await flushEnvironment('e1', [application('a1', 'qits-ci')], [deployment('d1', 'a1')]);
     expect(text()).toContain('Active');
   });

@@ -345,8 +345,8 @@ export class DeploymentRequestPage {
     const name = tier?.name ?? request.environmentId ?? '';
     const id = 'tier';
     if (!request.environmentId) {
-      // A request written before the platform plane gained a tier, and a real answer rather than a
-      // gap: nothing recorded where this was asked for, so nothing can say whether it is running.
+      // A row that recorded no environment, and a real answer rather than a gap: nothing says
+      // where this was asked for, so nothing can say whether it is running.
       return { id, title: 'Running', meta: 'no environment recorded', state: 'pending' };
     }
     const title = `Running in ${name}`;

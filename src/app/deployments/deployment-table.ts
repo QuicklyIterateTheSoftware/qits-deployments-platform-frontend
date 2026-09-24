@@ -34,10 +34,8 @@ import { tickingNow } from '../ui/ticker';
  * One environment as this page holds it: the three lists an expansion fetches, each with its own
  * state so a retry knows what to re-ask for.
  *
- * `applications` is the tier's catalogue **plus the platform services**, which the page merges in
- * from the flat listing for the one environment they are deployed into; nothing below this line can
- * tell the two apart except by the `target` on the row, which is exactly how much difference there
- * is left.
+ * `applications` is the environment's catalogue, whole: it is the table's row list, and an
+ * application missing from it is an application this environment does not track.
  *
  * `requests` is the third list and the odd one out: the table is drawn without it. It is what a
  * release *asked* for, and it can be missing while the table is still entirely true — so it is not
@@ -137,15 +135,6 @@ interface Row {
   readonly name: string;
   /** Null for a row the applications list does not explain — see `rows()`. */
   readonly repoId: string | null;
-  /**
-   * Whether this is a platform service rather than one of the tier's own.
-   *
-   * A tag on the row and nothing more. It used to be a section of its own, back when a platform
-   * service belonged to no environment and could not be listed under one; it belongs to this one
-   * now, and the only thing left worth saying is that it is not linked into it — which is why a
-   * release of it reaches every tier at once.
-   */
-  readonly platform: boolean;
   /** The newest deployment for this application, which is what "current" means here. */
   readonly current: CdDeploymentDto | null;
   /** Everything older, newest first. Mostly `DECOMMISSIONED`, and not drawn until asked for. */
@@ -261,18 +250,6 @@ interface Row {
                     </button>
                   } @else {
                     <span class="plain">{{ row.name }}</span>
-                  }
-                  <!--
-                    The whole of what used to be a section: a platform service runs in this
-                    environment like everything else and is linked into none of them, which is why
-                    one release of it reaches every tier at once.
-                  -->
-                  @if (row.platform) {
-                    <span
-                      class="tier"
-                      title="A platform service: deployed into this environment, linked into none"
-                      >platform</span
-                    >
                   }
                 </th>
                 <td>
@@ -499,7 +476,7 @@ interface Row {
     tbody tr:not(.expanded) + tr:not(.expanded) td {
       border-top: 1px solid #f3f4f6;
     }
-    /* Inline, so the platform tag sits beside the name rather than under it. */
+    /* A flex row so the chevron and the name share a baseline, inline so the cell stays a cell. */
     .twist {
       display: inline-flex;
       align-items: baseline;
@@ -522,16 +499,6 @@ interface Row {
     }
     .plain {
       padding-left: 1.3rem;
-    }
-    /* The per-row hint that replaced a section: quiet, and never a heading. */
-    .tier {
-      font-size: 0.68rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #4b5563;
-      background: #f3f4f6;
-      border-radius: 0.25rem;
-      padding: 0 0.3rem;
     }
     .never,
     .untracked,
@@ -741,13 +708,13 @@ export class DeploymentTable {
    * buckets are read head-first and neither listing's order is something this component can check.
    *
    * **Requests join by name and deployments by id**, which is not an inconsistency but the two
-   * keys the server offers: a deployment row records its plane so the server derives
-   * `platform:<name>` or `<tier>:<name>` from it, and a request records no plane so there is
+   * keys the server offers: a deployment is scheduled into an environment, so the server derives
+   * `<tier>:<name>` for it, and a request is written before anything is scheduled, so there is
    * nothing to derive from and the name is the honest key. A name is unique per tier either way.
    *
-   * Rows come out sorted by name, which is one rule for the tier's own services and the platform
-   * ones merged in beside them — an ordering that depended on which listing a row came from would
-   * be the old section back in everything but name.
+   * Rows come out sorted by name, and by nothing else. The three buckets below reach the table by
+   * different routes — the catalogue, a deployment nothing explains, a request nothing explains —
+   * and an ordering that let any of that show through would be grouping a reader never asked for.
    */
   protected readonly rows = computed<readonly Row[]>(() => {
     const state = this.state();
@@ -794,7 +761,6 @@ export class DeploymentTable {
       key: string,
       name: string,
       repoId: string | null,
-      platform: boolean,
       history: readonly CdDeploymentDto[],
     ): Row => {
       const asked = byName.get(name) ?? [];
@@ -805,7 +771,6 @@ export class DeploymentTable {
         key,
         name,
         repoId,
-        platform,
         current,
         history: history.slice(1),
         requests: asked,
@@ -821,13 +786,7 @@ export class DeploymentTable {
     const rows: Row[] = applications.map((application) => {
       const history = byApplication.get(application.id) ?? [];
       byApplication.delete(application.id);
-      return build(
-        application.id,
-        application.name,
-        application.repoId,
-        application.target === 'PLATFORM',
-        history,
-      );
+      return build(application.id, application.name, application.repoId, history);
     });
 
     // Deployments whose application the environment no longer lists. The API gives no way for this
@@ -835,7 +794,7 @@ export class DeploymentTable {
     // is not drawn is the one failure this table must not have, so it is drawn and labelled rather
     // than filtered away on the assumption.
     for (const [applicationId, history] of byApplication) {
-      rows.push(build(applicationId, history[0].applicationName, null, false, history));
+      rows.push(build(applicationId, history[0].applicationName, null, history));
     }
 
     // And the same for a release asked for under a name nothing here explains — the request outlives
@@ -845,7 +804,6 @@ export class DeploymentTable {
         key: `request:${name}`,
         name,
         repoId: null,
-        platform: false,
         current: null,
         history: [],
         requests: asked,
