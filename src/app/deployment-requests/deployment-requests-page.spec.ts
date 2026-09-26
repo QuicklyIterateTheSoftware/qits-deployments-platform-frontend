@@ -110,7 +110,7 @@ describe('DeploymentRequestsPage', () => {
   function expectRequests() {
     return http.expectOne(
       (candidate) =>
-        candidate.url === '/platform-deployments/api/deployment-requests' &&
+        candidate.url === '/deployments/api/deployment-requests' &&
         candidate.params.get('projectId') === 'p1',
     );
   }

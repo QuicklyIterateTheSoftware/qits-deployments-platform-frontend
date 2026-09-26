@@ -54,7 +54,7 @@ export class CdApi {
    */
   async environments(): Promise<readonly CdEnvironmentDto[]> {
     const response = await firstValueFrom(
-      this.http.get<CdEnvironmentsResponse>(`${this.base}/platform-deployments/api/environments`),
+      this.http.get<CdEnvironmentsResponse>(`${this.base}/deployments/api/environments`),
     );
     return response.environments;
   }
@@ -70,7 +70,7 @@ export class CdApi {
   async applications(environmentId: string): Promise<readonly CdApplicationDto[]> {
     const response = await firstValueFrom(
       this.http.get<CdEnvironmentResponse>(
-        `${this.base}/platform-deployments/api/environments/${encodeURIComponent(environmentId)}`,
+        `${this.base}/deployments/api/environments/${encodeURIComponent(environmentId)}`,
       ),
     );
     return response.environment.applications ?? [];
@@ -94,7 +94,7 @@ export class CdApi {
   async deployments(environmentId: string): Promise<readonly CdDeploymentDto[]> {
     const params = new HttpParams().set('environmentId', environmentId);
     const response = await firstValueFrom(
-      this.http.get<CdDeploymentsResponse>(`${this.base}/platform-deployments/api/deployments`, {
+      this.http.get<CdDeploymentsResponse>(`${this.base}/deployments/api/deployments`, {
         params,
       }),
     );
@@ -114,7 +114,7 @@ export class CdApi {
   async scale(applicationId: string, replicas: number): Promise<void> {
     await firstValueFrom(
       this.http.post(
-        `${this.base}/platform-deployments/api/applications/${encodeURIComponent(applicationId)}/scale`,
+        `${this.base}/deployments/api/applications/${encodeURIComponent(applicationId)}/scale`,
         { replicas },
       ),
     );
@@ -130,7 +130,7 @@ export class CdApi {
   async restart(applicationId: string): Promise<void> {
     await firstValueFrom(
       this.http.post(
-        `${this.base}/platform-deployments/api/applications/${encodeURIComponent(applicationId)}/restart`,
+        `${this.base}/deployments/api/applications/${encodeURIComponent(applicationId)}/restart`,
         {},
       ),
     );
@@ -151,7 +151,7 @@ export class CdApi {
     const params = new HttpParams().set('environmentId', environmentId);
     const response = await firstValueFrom(
       this.http.get<CdDeploymentRequestsResponse>(
-        `${this.base}/platform-deployments/api/deployment-requests`,
+        `${this.base}/deployments/api/deployment-requests`,
         { params },
       ),
     );
@@ -179,7 +179,7 @@ export class CdApi {
     const params = new HttpParams().set('projectId', projectId);
     const response = await firstValueFrom(
       this.http.get<CdDeploymentRequestsResponse>(
-        `${this.base}/platform-deployments/api/deployment-requests`,
+        `${this.base}/deployments/api/deployment-requests`,
         { params },
       ),
     );
@@ -197,7 +197,7 @@ export class CdApi {
   async deploymentRequest(id: string): Promise<CdDeploymentRequestDetailResponse> {
     return await firstValueFrom(
       this.http.get<CdDeploymentRequestDetailResponse>(
-        `${this.base}/platform-deployments/api/deployment-requests/${encodeURIComponent(id)}`,
+        `${this.base}/deployments/api/deployment-requests/${encodeURIComponent(id)}`,
       ),
     );
   }
@@ -220,7 +220,7 @@ export class CdApi {
     const params = new HttpParams().set('repoId', repoId).set('version', version);
     const response = await firstValueFrom(
       this.http.get<CdDeploymentRequestsResponse>(
-        `${this.base}/platform-deployments/api/deployment-requests`,
+        `${this.base}/deployments/api/deployment-requests`,
         { params },
       ),
     );

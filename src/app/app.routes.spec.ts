@@ -48,7 +48,7 @@ describe('routes', () => {
       .expectOne('/projects/api/projects')
       .flush({ entries: PROJECTS.map((project) => ({ project: { ...project, dns: null } })) });
     http
-      .expectOne('/platform-deployments/api/environments')
+      .expectOne('/deployments/api/environments')
       .flush({ environments: [{ id: 'e1', name: 'qits', platform: false }] });
     for (let round = 0; round < 3; round += 1) {
       await harness.fixture.whenStable();
@@ -75,13 +75,13 @@ describe('routes', () => {
     ).not.toBeNull();
     // The scope seeded the expansion, so the environment behind the scoped project was read
     // without a click — the two requests an open row costs.
-    http.expectOne('/platform-deployments/api/environments/e1').flush({
+    http.expectOne('/deployments/api/environments/e1').flush({
       environment: { id: 'e1', name: 'qits', platform: false, applications: [] },
     });
     http
       .expectOne(
         (request) =>
-          request.url === '/platform-deployments/api/deployments' &&
+          request.url === '/deployments/api/deployments' &&
           request.params.get('environmentId') === 'e1',
       )
       .flush({ deployments: [] });
@@ -114,7 +114,7 @@ describe('routes', () => {
     http
       .expectOne(
         (request) =>
-          request.url === '/platform-deployments/api/deployment-requests' &&
+          request.url === '/deployments/api/deployment-requests' &&
           request.params.get('projectId') === 'p1',
       )
       .flush({ deploymentRequests: [] });
@@ -127,7 +127,7 @@ describe('routes', () => {
     expect(
       (harness.routeNativeElement as HTMLElement).querySelector('app-deployment-request-page'),
     ).not.toBeNull();
-    http.expectOne('/platform-deployments/api/deployment-requests/r1');
+    http.expectOne('/deployments/api/deployment-requests/r1');
   });
 
   it('lets the by-release literal win over the id parameter beside it', async () => {
@@ -143,7 +143,7 @@ describe('routes', () => {
     ).not.toBeNull();
     http.expectOne(
       (request) =>
-        request.url === '/platform-deployments/api/deployment-requests' &&
+        request.url === '/deployments/api/deployment-requests' &&
         request.params.get('repoId') === 'repo-ci' &&
         request.params.get('version') === '2026.903.1',
     );

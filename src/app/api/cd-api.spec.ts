@@ -6,7 +6,7 @@ import { CdApi } from './cd-api';
 /**
  * The paths and the envelopes, asserted once here so the page's spec can be about rendering.
  *
- * These are same-origin absolute paths on purpose — the SPA is served at `/platform-deployments/`
+ * These are same-origin absolute paths on purpose — the SPA is served at `/deployments/`
  * behind the gateway that also serves `/projects/api/…`, and that is what carries the session
  * cookie to both.
  */
@@ -26,7 +26,7 @@ describe('CdApi', () => {
 
   it('unwraps the environment list', async () => {
     const environments = api.environments();
-    http.expectOne('/platform-deployments/api/environments').flush({
+    http.expectOne('/deployments/api/environments').flush({
       environments: [
         {
           id: 'e1',
@@ -43,7 +43,7 @@ describe('CdApi', () => {
 
   it('reads one environment for its applications, through the singular envelope', async () => {
     const applications = api.applications('e1');
-    http.expectOne('/platform-deployments/api/environments/e1').flush({
+    http.expectOne('/deployments/api/environments/e1').flush({
       environment: {
         id: 'e1',
         name: 'qits',
@@ -67,7 +67,7 @@ describe('CdApi', () => {
     // The *list* endpoint answers `applications: null` by design; a single read should not, but a
     // client that assumed so would throw on the one response shape the service already emits.
     const applications = api.applications('e1');
-    http.expectOne('/platform-deployments/api/environments/e1').flush({
+    http.expectOne('/deployments/api/environments/e1').flush({
       environment: { id: 'e1', name: 'qits', network: 'n', applications: null },
     });
     await expect(applications).resolves.toEqual([]);
@@ -77,7 +77,7 @@ describe('CdApi', () => {
     const deployments = api.deployments('e1');
     const request = http.expectOne(
       (candidate) =>
-        candidate.url === '/platform-deployments/api/deployments' &&
+        candidate.url === '/deployments/api/deployments' &&
         candidate.params.get('environmentId') === 'e1',
     );
     request.flush({ deployments: [] });
@@ -87,7 +87,7 @@ describe('CdApi', () => {
   it('posts a restart to the application, with no body to get wrong', async () => {
     const restarted = api.restart('e1:qits-ci');
     const request = http.expectOne(
-      '/platform-deployments/api/applications/e1%3Aqits-ci/restart',
+      '/deployments/api/applications/e1%3Aqits-ci/restart',
     );
     expect(request.request.method).toBe('POST');
     request.flush({});
@@ -98,7 +98,7 @@ describe('CdApi', () => {
     // Zero stops it and one starts it; the service refuses anything above one, because every
     // application on this platform is deployed as a single task.
     const stopped = api.scale('e1:qits-ci', 0);
-    const request = http.expectOne('/platform-deployments/api/applications/e1%3Aqits-ci/scale');
+    const request = http.expectOne('/deployments/api/applications/e1%3Aqits-ci/scale');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ replicas: 0 });
     request.flush({});
@@ -110,7 +110,7 @@ describe('CdApi', () => {
     // encoded — a raw colon in a segment is legal but is exactly the kind of thing a proxy in front
     // rewrites.
     const started = api.scale('e1:qits-ci', 1);
-    http.expectOne('/platform-deployments/api/applications/e1%3Aqits-ci/scale').flush({});
+    http.expectOne('/deployments/api/applications/e1%3Aqits-ci/scale').flush({});
     await expect(started).resolves.toBeUndefined();
   });
 
@@ -121,7 +121,7 @@ describe('CdApi', () => {
     http
       .expectOne(
         (candidate) =>
-          candidate.url === '/platform-deployments/api/deployment-requests' &&
+          candidate.url === '/deployments/api/deployment-requests' &&
           candidate.params.get('environmentId') === 'e1',
       )
       .flush({
@@ -145,7 +145,7 @@ describe('CdApi', () => {
   it('rejects with the HttpErrorResponse, so callers can read the status', async () => {
     const deployments = api.deployments('nope');
     http
-      .expectOne((candidate) => candidate.url === '/platform-deployments/api/deployments')
+      .expectOne((candidate) => candidate.url === '/deployments/api/deployments')
       .flush({ message: 'No such environment' }, { status: 404, statusText: 'Not Found' });
     await expect(deployments).rejects.toBeInstanceOf(HttpErrorResponse);
   });

@@ -136,16 +136,16 @@ describe('DeploymentRequestPage', () => {
     releaseRequests?: readonly ProjectsReleaseRequestDto[] | 'down';
   }): Promise<void> {
     http
-      .expectOne('/platform-deployments/api/deployment-requests/r1')
+      .expectOne('/deployments/api/deployment-requests/r1')
       .flush({ deploymentRequest: options.request, deployment: options.deployment });
     await settle();
     http
-      .expectOne('/platform-deployments/api/environments')
+      .expectOne('/deployments/api/environments')
       .flush({ environments: [{ id: 'e1', name: 'dev', network: 'qits-net', platform: true }] });
     http
       .expectOne(
         (candidate) =>
-          candidate.url === '/platform-deployments/api/deployments' &&
+          candidate.url === '/deployments/api/deployments' &&
           candidate.params.get('environmentId') === 'e1',
       )
       .flush({ deployments: options.deployments });
@@ -305,13 +305,13 @@ describe('DeploymentRequestPage', () => {
 
     await pastOnePoll();
     http
-      .expectOne('/platform-deployments/api/deployment-requests/r1')
+      .expectOne('/deployments/api/deployment-requests/r1')
       .flush({ deploymentRequest: request(), deployment: deployment() });
     await settle();
     http
       .expectOne(
         (candidate) =>
-          candidate.url === '/platform-deployments/api/deployments' &&
+          candidate.url === '/deployments/api/deployments' &&
           candidate.params.get('environmentId') === 'e1',
       )
       .flush({ deployments: [deployment()] });

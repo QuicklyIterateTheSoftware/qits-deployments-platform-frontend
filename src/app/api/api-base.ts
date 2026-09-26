@@ -3,7 +3,7 @@ import { InjectionToken } from '@angular/core';
 /**
  * The origin every request in this app is built on, and it is empty on purpose.
  *
- * The SPA is served at `/platform-deployments/` by qits-deployments itself, behind the same
+ * The SPA is served at `/deployments/` by qits-deployments itself, behind the same
  * gateway that serves `/projects/api/…` — so a same-origin absolute path is not a shortcut, it is
  * the whole reason the browser's session cookie reaches both services with no machine token and no
  * CORS pre-flight. A configured base URL would move these calls cross-origin and lose exactly that.

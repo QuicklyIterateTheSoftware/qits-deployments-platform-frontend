@@ -7,7 +7,7 @@ import { RouterOutlet } from '@angular/router';
  * route (see app.routes.ts), so it survives navigation rather than being rebuilt here.
  *
  * That leaves the outlet as the only thing this component owns, which is the point:
- * `/platform-deployments/` is this app's base href, not one of its routes, and nothing above the
+ * `/deployments/` is this app's base href, not one of its routes, and nothing above the
  * router should know it.
  */
 @Component({

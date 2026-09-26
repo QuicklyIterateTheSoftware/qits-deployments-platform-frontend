@@ -80,7 +80,7 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * - an environment no project's slug matches, in a bucket of its own that is drawn always, because
  *   "0 environments" is information.
  *
- * Neither direction needs a service gap. `GET /platform-deployments/api/environments` returns
+ * Neither direction needs a service gap. `GET /deployments/api/environments` returns
  * everything, so the unmatched set is a client-side difference — the asymmetry with the ci
  * explorer, whose run listing
  * takes a mandatory repository filter and therefore cannot see its own orphans without one.
@@ -95,7 +95,7 @@ function withEntry<T>(map: ReadonlyMap<string, T>, key: string, value: T): Reado
  * cost of an expansion is one number and not two.
  *
  * Expansion lives in the query parameters
- * (`/platform-deployments/?project=…`, and `env=` for the bucket) rather than in path segments: it
+ * (`/deployments/?project=…`, and `env=` for the bucket) rather than in path segments: it
  * is view state, the path is for resources, and a history entry per expansion is what makes the
  * back button mean
  * "collapse".
@@ -574,7 +574,7 @@ export class DeploymentsPage {
   /**
    * The sentence for a project whose slug names nothing in qits-deployments. It quotes the *slug*,
    * not the project's display name, because the slug is what the convention actually compares — an
-   * operator chasing this reads it against `GET /platform-deployments/api/environments` and the two
+   * operator chasing this reads it against `GET /deployments/api/environments` and the two
    * have to be the same string.
    */
   protected noEnvironmentMessage(project: ProjectDto): string {

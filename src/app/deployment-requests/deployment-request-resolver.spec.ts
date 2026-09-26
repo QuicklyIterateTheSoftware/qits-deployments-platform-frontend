@@ -77,7 +77,7 @@ describe('DeploymentRequestResolver', () => {
   function expectLookup() {
     return http.expectOne(
       (candidate) =>
-        candidate.url === '/platform-deployments/api/deployment-requests' &&
+        candidate.url === '/deployments/api/deployment-requests' &&
         candidate.params.get('repoId') === 'repo ci' &&
         candidate.params.get('version') === '2026.903.113443',
     );
@@ -92,7 +92,7 @@ describe('DeploymentRequestResolver', () => {
 
     expect(TestBed.inject(Router).url).toBe('/qits/deployment-requests/r2');
     // The detail page is now loading; this spec is about the hop, not about what it lands on.
-    http.expectOne('/platform-deployments/api/deployment-requests/r2');
+    http.expectOne('/deployments/api/deployment-requests/r2');
   });
 
   it('says so when the release deployed nothing, and offers to look again', async () => {

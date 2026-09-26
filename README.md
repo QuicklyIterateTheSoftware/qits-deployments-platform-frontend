@@ -23,7 +23,7 @@ having happened. The front page already folds requests into an application's row
 in dev" and wrong for "what has my project been shipping". A project's releases enter at whichever
 environment the platform designates, and the designation moves.
 
-So the list reads `GET /platform-deployments/api/deployment-requests?projectId=…`, one request, and
+So the list reads `GET /deployments/api/deployment-requests?projectId=…`, one request, and
 draws two sections: **Pending**, which is everything the platform has not finished with, and
 **Completed**, which is the ten most recent that are. Both halves are decided by the server —
 `RequestLifecycle` there, `isCompletedRequest` here, and the two are written to agree — and the cap
@@ -122,7 +122,7 @@ only** — no column links the two services. So the page draws a match, never a 
 both kinds of non-match: a project whose slug names no environment says so on expansion (the usual
 cause is qits-projects' `CdEnvironmentNotifier` having failed), and every environment no project
 claims sits in an **`Environments matching no project`** bucket that is drawn even when it is empty.
-Neither needs a service gap: `GET /platform-deployments/api/environments` returns everything, so
+Neither needs a service gap: `GET /deployments/api/environments` returns everything, so
 both orphan sets are a client-side difference.
 
 A row's current deployment is the newest row for that application in a list the service already
@@ -141,7 +141,7 @@ gate → deployment**. The **Version** column is the CalVer coordinate the relea
 tag, and the tag the image carries — because that is what identifies a deployment; the commit
 beside it is what the tag resolved to and may be absent, which is a real answer and not a gap.
 
-`GET /platform-deployments/api/deployment-requests?environmentId=…` is the third read an expansion
+`GET /deployments/api/deployment-requests?environmentId=…` is the third read an expansion
 makes, and it exists because a request the quality gate refused **queues no deployment at all** —
 there is no row in the deployments listing that could show it. Where the newest request is not the
 deployment on the row, the version cell says so (`→ 2026.903.12 · gate unmet`), and the row's
@@ -164,7 +164,7 @@ whole of the way in; there is no third root and no row that is drawn anywhere bu
 environment it runs in.
 
 The base path is `/`: qits-deployments serves this app at the root of its own host, so `baseHref`
-here spells no segment at all. The `/platform-deployments` segment survives only as that service's
+here spells no segment at all. The `/deployments` segment survives only as that service's
 wire prefix, in three of its keys (`quarkus.quinoa.ignored-path-prefixes`, `quarkus.rest.path`,
 `quarkus.http.non-application-root-path`) and its `routes:` line — all of them in that repository.
 The Angular project, the package and the type names still say `cd`; only paths moved.
@@ -190,7 +190,7 @@ ng serve
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
 
-`proxy.conf.json` forwards `/platform-deployments/api`, `/projects/api` and `/main-navigation` to
+`proxy.conf.json` forwards `/deployments/api`, `/projects/api` and `/main-navigation` to
 an edge on `localhost:8080`, because `ng serve` puts no edge in front and the screen reads across
 two services. In a deployment every call is a same-origin path on this service's own host — the
 edge path-routes every application's segment on every vhost — which is what carries the session

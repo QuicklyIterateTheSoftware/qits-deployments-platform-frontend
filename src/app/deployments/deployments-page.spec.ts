@@ -223,7 +223,7 @@ describe('DeploymentsPage', () => {
   }
 
   function flushEnvironments(environments: readonly CdEnvironmentDto[]): void {
-    http.expectOne('/platform-deployments/api/environments').flush({ environments });
+    http.expectOne('/deployments/api/environments').flush({ environments });
   }
 
   async function flushRoots(
@@ -238,7 +238,7 @@ describe('DeploymentsPage', () => {
   function expectDeployments(environmentId: string) {
     return http.expectOne(
       (candidate) =>
-        candidate.url === '/platform-deployments/api/deployments' &&
+        candidate.url === '/deployments/api/deployments' &&
         candidate.params.get('environmentId') === environmentId,
     );
   }
@@ -246,7 +246,7 @@ describe('DeploymentsPage', () => {
   function expectRequests(environmentId: string) {
     return http.expectOne(
       (candidate) =>
-        candidate.url === '/platform-deployments/api/deployment-requests' &&
+        candidate.url === '/deployments/api/deployment-requests' &&
         candidate.params.get('environmentId') === environmentId,
     );
   }
@@ -262,7 +262,7 @@ describe('DeploymentsPage', () => {
     deployments: readonly CdDeploymentDto[],
     requests: readonly CdDeploymentRequestDto[] = [],
   ): Promise<void> {
-    http.expectOne(`/platform-deployments/api/environments/${environmentId}`).flush({
+    http.expectOne(`/deployments/api/environments/${environmentId}`).flush({
       environment: { ...environment(environmentId, environmentId), applications },
     });
     expectDeployments(environmentId).flush({ deployments });
@@ -802,7 +802,7 @@ describe('DeploymentsPage', () => {
 
     await click('qits');
     http
-      .expectOne('/platform-deployments/api/environments/e1')
+      .expectOne('/deployments/api/environments/e1')
       .flush(null, { status: 503, statusText: 'Service Unavailable' });
     expectDeployments('e1').flush(null, { status: 503, statusText: 'Service Unavailable' });
     expectRequests('e1').flush(null, { status: 503, statusText: 'Service Unavailable' });
@@ -828,7 +828,7 @@ describe('DeploymentsPage', () => {
     await flushRoots([project('p1', 'qits', 'qits')], [environment('e1', 'qits')]);
 
     await click('qits');
-    http.expectOne('/platform-deployments/api/environments/e1').flush({
+    http.expectOne('/deployments/api/environments/e1').flush({
       environment: { ...environment('e1', 'qits'), applications: [application('a1', 'qits-ci')] },
     });
     expectDeployments('e1').flush({ deployments: [deployment('d1', 'a1')] });
@@ -844,7 +844,7 @@ describe('DeploymentsPage', () => {
     await open();
     http.expectOne('/projects/api/projects').flush(null, { status: 500, statusText: 'Error' });
     http
-      .expectOne('/platform-deployments/api/environments')
+      .expectOne('/deployments/api/environments')
       .flush(null, { status: 500, statusText: 'Error' });
     await settle();
 
@@ -871,7 +871,7 @@ describe('DeploymentsPage', () => {
     await open();
     flushProjects([project('p1', 'qits', 'qits')]);
     http
-      .expectOne('/platform-deployments/api/environments')
+      .expectOne('/deployments/api/environments')
       .flush(null, { status: 503, statusText: 'Down' });
     await settle();
 
@@ -1025,7 +1025,7 @@ describe('DeploymentsPage', () => {
   }
 
   function expectOperation(path: string) {
-    return http.expectOne(`/platform-deployments/api/applications/${path}`);
+    return http.expectOne(`/deployments/api/applications/${path}`);
   }
 
   it('restarts an application in place and reads the environment back', async () => {
